@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Magneto — Mi Perfil</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="logo-icon small">M</span> Magneto Empleos
+    </div>
+    <div class="nav-links">
+      <a href="dashboard.html">Inicio</a>
+      <a href="jobs.html">Empleos</a>
+      <a href="profile.html" class="active">Mi Perfil</a>
+      <button class="btn-logout" onclick="logout()">Salir</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h2 class="page-title">Mi Perfil</h2>
+    <p class="page-sub">Mantén tu perfil actualizado para obtener mejores matches</p>
+
+    <div class="profile-card">
+      <div class="profile-top">
+        <div class="avatar" id="avatarLetters">?</div>
+        <div>
+          <h3 id="profileName">...</h3>
+          <p id="profileEmail">...</p>
+        </div>
+      </div>
+
+      <form onsubmit="saveProfile(event)">
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Ciudad</label>
+            <input type="text" id="city" placeholder="Ej: Medellín, Bogotá..." />
+          </div>
+          <div class="field">
+            <label>Modalidad preferida</label>
+            <select id="modality">
+              <option value="">-- Selecciona --</option>
+              <option value="remote">Remoto</option>
+              <option value="hybrid">Híbrido</option>
+              <option value="on-site">Presencial</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Salario mínimo esperado (COP)</label>
+            <input type="number" id="salaryMin" placeholder="Ej: 3000000" min="0" step="100000" />
+          </div>
+          <div class="field">
+            <label>Salario máximo esperado (COP)</label>
+            <input type="number" id="salaryMax" placeholder="Ej: 8000000" min="0" step="100000" />
+          </div>
+          <div class="field">
+            <label>Años de experiencia</label>
+            <input type="number" id="yearsExp" placeholder="Ej: 2" min="0" max="50" />
+          </div>
+        </div>
+
+        <!-- Skills -->
+        <div class="field">
+          <label>Mis Skills</label>
+          <p class="field-hint">Escribe una skill y presiona Enter o coma para agregarla</p>
+          <div class="skills-input-area" onclick="document.getElementById('skillInput').focus()">
+            <div id="skillTags"></div>
+            <input type="text" id="skillInput" placeholder="python, sql, react..." onkeydown="handleSkillInput(event)" />
+          </div>
+        </div>
+
+        <div id="profileMsg" class="status-msg hidden"></div>
+        <button type="submit" class="btn-primary">Guardar perfil</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script>
+    requireAuth();
+    const user = getUser();
+    let skills = [];
+
+    if (user) {
+      document.getElementById("profileName").textContent = user.full_name;
+      document.getElementById("profileEmail").textContent = user.email;
+      document.getElementById("avatarLetters").textContent = user.full_name.charAt(0).toUpperCase();
+    }
+
+    async function loadProfile() {
+      try {
+        const data = await apiFetch("/profile/");
+        const p = data.profile;
+        if (p) {
+          document.getElementById("city").value = p.location_city || "";
+          document.getElementById("modality").value = p.modality || "";
+          document.getElementById("salaryMin").value = p.salary_min_cop || "";
+          document.getElementById("salaryMax").value = p.salary_max_cop || "";
+          document.getElementById("yearsExp").value = p.years_exp || "";
+          skills = p.skills || [];
+          renderSkills();
+        }
+      } catch (err) {
+        console.error("Error cargando perfil:", err.message);
+      }
+    }
+
+    function renderSkills() {
+      const container = document.getElementById("skillTags");
+      container.innerHTML = skills.map((s, i) => `
+        <span class="skill-tag editable">
+          ${s} <button type="button" onclick="removeSkill(${i})">×</button>
+        </span>
+      `).join("");
+    }
+
+    function removeSkill(index) {
+      skills.splice(index, 1);
+      renderSkills();
+    }
+
+    function handleSkillInput(e) {
+      if (e.key === "Enter" || e.key === ",") {
+        e.preventDefault();
+        const input = document.getElementById("skillInput");
+        const value = input.value.trim().replace(/,$/, "").toLowerCase();
+        if (value && !skills.includes(value)) {
+          skills.push(value);
+          renderSkills();
+        }
+        input.value = "";
+      }
+    }
+
+    async function saveProfile(e) {
+      e.preventDefault();
+      const msgEl = document.getElementById("profileMsg");
+      msgEl.classList.remove("hidden", "success", "error");
+      msgEl.className = "status-msg info";
+      msgEl.textContent = "Guardando...";
+
+      try {
+        await apiFetch("/profile/", {
+          method: "PUT",
+          body: JSON.stringify({
+            location_city: document.getElementById("city").value || null,
+            modality: document.getElementById("modality").value || null,
+            salary_min_cop: parseInt(document.getElementById("salaryMin").value) || null,
+            salary_max_cop: parseInt(document.getElementById("salaryMax").value) || null,
+            years_exp: parseInt(document.getElementById("yearsExp").value) || null,
+            skills: skills,
+          }),
+        });
+        msgEl.textContent = "Perfil guardado correctamente";
+        msgEl.className = "status-msg success";
+      } catch (err) {
+        msgEl.textContent = err.message;
+        msgEl.className = "status-msg error";
+      }
+
+      setTimeout(() => msgEl.classList.add("hidden"), 3000);
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>
