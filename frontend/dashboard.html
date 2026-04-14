@@ -2,51 +2,42 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Magneto — Dashboard</title>
+  <title>Magneto - Dashboard</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <nav class="navbar">
-    <div class="nav-brand">
-      <span class="logo-icon small">M</span> Magneto Empleos
-    </div>
-    <div class="nav-links">
-      <a href="dashboard.html" class="active">Inicio</a>
+  <nav>
+    <div class="brand">Magneto Empleos</div>
+    <div class="links">
+      <a href="dashboard.html">Inicio</a>
       <a href="jobs.html">Empleos</a>
       <a href="profile.html">Mi Perfil</a>
-      <button class="btn-logout" onclick="logout()">Salir</button>
+      <button onclick="logout()">Salir</button>
     </div>
   </nav>
 
   <div class="container">
 
-    <!-- Saludo -->
-    <div class="welcome-bar">
-      <div>
-        <h2 id="welcomeName">Hola!</h2>
-        <p>Estos son tus mejores matches de hoy</p>
-      </div>
-      <div class="notif-area">
-        <button class="btn-notif" onclick="toggleNotifications()">
-          🔔 <span id="notifCount" class="badge hidden">0</span>
-        </button>
-        <button class="btn-match" onclick="runMatching()">⚡ Buscar matches</button>
-      </div>
+    <h2 id="saludo">Hola!</h2>
+    <p class="text-muted" style="margin-bottom: 16px;">Estos son tus mejores matches</p>
+
+    <div style="margin-bottom: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
+      <button class="btn btn-primary" onclick="buscarMatches()">Buscar matches</button>
+      <button class="btn btn-secondary" onclick="toggleNotif()">Notificaciones</button>
     </div>
 
-    <!-- Panel de notificaciones (oculto por defecto) -->
-    <div id="notifPanel" class="notif-panel hidden">
-      <h3>Notificaciones</h3>
-      <div id="notifList"></div>
+    <div id="matchStatus"></div>
+
+    <!-- Panel de notificaciones -->
+    <div id="notifPanel" class="card hidden">
+      <h3 style="margin-bottom: 12px; font-size: 15px;">Notificaciones</h3>
+      <div id="notifLista"><p class="text-muted">Sin notificaciones.</p></div>
     </div>
 
-    <!-- Estado del matching -->
-    <div id="matchStatus" class="status-msg hidden"></div>
-
-    <!-- Lista de matches -->
+    <!-- Matches -->
     <div id="matchesContainer">
-      <div class="loading">Cargando tus matches...</div>
+      <p class="text-muted">Cargando...</p>
     </div>
 
   </div>
@@ -55,102 +46,78 @@
   <script>
     requireAuth();
     const user = getUser();
-    if (user) document.getElementById("welcomeName").textContent = `Hola, ${user.full_name.split(" ")[0]}!`;
+    if (user) document.getElementById("saludo").textContent = "Hola, " + user.full_name.split(" ")[0] + "!";
 
-    async function loadMatches() {
-      const container = document.getElementById("matchesContainer");
+    function claseScore(s) {
+      if (s >= 80) return "score-alto";
+      if (s >= 50) return "score-medio";
+      return "score-bajo";
+    }
+
+    async function cargarMatches() {
+      const cont = document.getElementById("matchesContainer");
       try {
         const matches = await apiFetch("/matches/");
         if (matches.length === 0) {
-          container.innerHTML = `
-            <div class="empty-state">
-              <p>Aún no tienes matches.</p>
-              <p>Asegúrate de tener tus <a href="profile.html">skills en tu perfil</a> y luego haz clic en <strong>⚡ Buscar matches</strong>.</p>
-            </div>`;
+          cont.innerHTML = `<div class="card text-center"><p>No tienes matches todavía.</p><p class="text-muted">Completa tu <a href="profile.html">perfil</a> y haz clic en "Buscar matches".</p></div>`;
           return;
         }
-
-        container.innerHTML = matches.map(m => `
+        cont.innerHTML = matches.map(m => `
           <div class="match-card">
-            <div class="match-header">
-              <div>
-                <h3>${m.title}</h3>
-                <span class="company">${m.company}</span>
-                <span class="location">📍 ${m.city} · ${m.modality}</span>
-              </div>
-              <div class="score-badge ${scoreClass(m.score)}">${m.score}%</div>
-            </div>
-            <p class="match-exp">${m.explanation}</p>
-            <div class="match-footer">
-              <span class="salary">💰 $${m.salary_min_cop?.toLocaleString()} – $${m.salary_max_cop?.toLocaleString()}</span>
-              <div class="skills-row">
-                ${(m.skills_required || []).map(s => `<span class="skill-tag">${s}</span>`).join("")}
-              </div>
+            <div class="score ${claseScore(m.score)}">${m.score}%</div>
+            <h3>${m.title}</h3>
+            <span class="company">${m.company}</span>
+            <p class="meta">📍 ${m.city} · ${m.modality}</p>
+            <p class="explanation">${m.explanation}</p>
+            <p class="salary">💰 $${m.salary_min_cop?.toLocaleString()} – $${m.salary_max_cop?.toLocaleString()} COP</p>
+            <div class="skills-row">
+              ${(m.skills_required || []).map(s => `<span class="skill-tag">${s}</span>`).join("")}
             </div>
           </div>
         `).join("");
       } catch (err) {
-        container.innerHTML = `<div class="empty-state">Error cargando matches: ${err.message}</div>`;
+        cont.innerHTML = `<div class="msg msg-error">Error: ${err.message}</div>`;
       }
     }
 
-    async function loadNotifications() {
+    async function cargarNotificaciones() {
       try {
         const data = await apiFetch("/notifications/");
-        const badge = document.getElementById("notifCount");
-        const list = document.getElementById("notifList");
-
+        const lista = document.getElementById("notifLista");
         if (data.total > 0) {
-          badge.textContent = data.total;
-          badge.classList.remove("hidden");
-          list.innerHTML = data.notificaciones.map(n => `
+          lista.innerHTML = data.notificaciones.map(n => `
             <div class="notif-item">
-              <div class="notif-score ${scoreClass(n.score)}">${n.score}%</div>
-              <div>
-                <strong>${n.titulo}</strong>
-                <p>${n.mensaje}</p>
-                <small>📍 ${n.ciudad} · ${n.modalidad} · ${n.fecha}</small>
-              </div>
+              <strong>${n.titulo} — <span class="${claseScore(n.score)}">${n.score}%</span></strong>
+              <span>${n.mensaje}</span>
+              <small>📍 ${n.ciudad} · ${n.modalidad} · ${n.fecha}</small>
             </div>
           `).join("");
         } else {
-          list.innerHTML = "<p class='no-notif'>Sin notificaciones nuevas. Busca matches primero.</p>";
+          lista.innerHTML = `<p class="text-muted">Sin notificaciones. Busca matches primero.</p>`;
         }
-      } catch (err) { /* silencioso */ }
+      } catch (e) {}
     }
 
-    async function runMatching() {
+    async function buscarMatches() {
       const statusEl = document.getElementById("matchStatus");
-      statusEl.textContent = "Buscando matches...";
-      statusEl.className = "status-msg info";
-      statusEl.classList.remove("hidden");
-
+      statusEl.innerHTML = `<div class="msg msg-info">Buscando matches...</div>`;
       try {
         const data = await apiFetch("/matches/run", { method: "POST" });
-        statusEl.textContent = data.message;
-        statusEl.className = "status-msg success";
-        await loadMatches();
-        await loadNotifications();
+        statusEl.innerHTML = `<div class="msg msg-success">${data.message}</div>`;
+        await cargarMatches();
+        await cargarNotificaciones();
       } catch (err) {
-        statusEl.textContent = err.message;
-        statusEl.className = "status-msg error";
+        statusEl.innerHTML = `<div class="msg msg-error">${err.message}</div>`;
       }
-
-      setTimeout(() => statusEl.classList.add("hidden"), 4000);
+      setTimeout(() => statusEl.innerHTML = "", 4000);
     }
 
-    function toggleNotifications() {
+    function toggleNotif() {
       document.getElementById("notifPanel").classList.toggle("hidden");
     }
 
-    function scoreClass(score) {
-      if (score >= 80) return "score-high";
-      if (score >= 50) return "score-mid";
-      return "score-low";
-    }
-
-    loadMatches();
-    loadNotifications();
+    cargarMatches();
+    cargarNotificaciones();
   </script>
 </body>
 </html>

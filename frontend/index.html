@@ -2,79 +2,84 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Magneto Empleos — Iniciar sesión</title>
+  <title>Magneto Empleos - Login</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body class="auth-page">
+<body>
 
-  <div class="auth-card">
-    <div class="auth-logo">
-      <span class="logo-icon">M</span>
+  <div class="auth-wrapper">
+    <div class="auth-box">
+
       <h1>Magneto Empleos</h1>
       <p>Encuentra el trabajo que hace match contigo</p>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="mostrarTab('login')">Iniciar sesión</button>
+        <button class="tab-btn" onclick="mostrarTab('registro')">Registrarse</button>
+      </div>
+
+      <!-- Login -->
+      <div id="tabLogin">
+        <div id="loginMsg"></div>
+        <form onsubmit="hacerLogin(event)">
+          <div class="field">
+            <label>Email</label>
+            <input type="email" id="loginEmail" placeholder="correo@ejemplo.com" required />
+          </div>
+          <div class="field">
+            <label>Contraseña</label>
+            <input type="password" id="loginPassword" placeholder="Contraseña" required />
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%">Entrar</button>
+        </form>
+      </div>
+
+      <!-- Registro -->
+      <div id="tabRegistro" class="hidden">
+        <div id="registroMsg"></div>
+        <form onsubmit="hacerRegistro(event)">
+          <div class="field">
+            <label>Nombre completo</label>
+            <input type="text" id="regNombre" placeholder="Juan Pérez" required />
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input type="email" id="regEmail" placeholder="correo@ejemplo.com" required />
+          </div>
+          <div class="field">
+            <label>Contraseña</label>
+            <input type="password" id="regPassword" placeholder="Mínimo 6 caracteres" minlength="6" required />
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%">Crear cuenta</button>
+        </form>
+      </div>
+
     </div>
-
-    <!-- Tabs -->
-    <div class="tabs">
-      <button class="tab active" onclick="showTab('login')">Iniciar sesión</button>
-      <button class="tab" onclick="showTab('register')">Registrarse</button>
-    </div>
-
-    <!-- Login -->
-    <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
-      <div class="field">
-        <label>Email</label>
-        <input type="email" id="loginEmail" placeholder="tucorreo@ejemplo.com" required />
-      </div>
-      <div class="field">
-        <label>Contraseña</label>
-        <input type="password" id="loginPassword" placeholder="••••••••" required />
-      </div>
-      <div id="loginError" class="error-msg"></div>
-      <button type="submit" class="btn-primary">Entrar</button>
-    </form>
-
-    <!-- Register -->
-    <form id="registerForm" class="auth-form hidden" onsubmit="handleRegister(event)">
-      <div class="field">
-        <label>Nombre completo</label>
-        <input type="text" id="regName" placeholder="Juan Pérez" required />
-      </div>
-      <div class="field">
-        <label>Email</label>
-        <input type="email" id="regEmail" placeholder="tucorreo@ejemplo.com" required />
-      </div>
-      <div class="field">
-        <label>Contraseña</label>
-        <input type="password" id="regPassword" placeholder="Mínimo 6 caracteres" required minlength="6" />
-      </div>
-      <div id="registerError" class="error-msg"></div>
-      <button type="submit" class="btn-primary">Crear cuenta</button>
-    </form>
   </div>
 
   <script src="config.js"></script>
   <script>
-    // Si ya hay sesion, redirigir al dashboard
     if (getToken()) window.location.href = "dashboard.html";
 
-    function showTab(tab) {
-      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-      document.querySelectorAll(".auth-form").forEach(f => f.classList.add("hidden"));
+    function mostrarTab(tab) {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.getElementById("tabLogin").classList.add("hidden");
+      document.getElementById("tabRegistro").classList.add("hidden");
 
       if (tab === "login") {
-        document.querySelectorAll(".tab")[0].classList.add("active");
-        document.getElementById("loginForm").classList.remove("hidden");
+        document.querySelectorAll(".tab-btn")[0].classList.add("active");
+        document.getElementById("tabLogin").classList.remove("hidden");
       } else {
-        document.querySelectorAll(".tab")[1].classList.add("active");
-        document.getElementById("registerForm").classList.remove("hidden");
+        document.querySelectorAll(".tab-btn")[1].classList.add("active");
+        document.getElementById("tabRegistro").classList.remove("hidden");
       }
     }
 
-    async function handleLogin(e) {
+    async function hacerLogin(e) {
       e.preventDefault();
-      const errEl = document.getElementById("loginError");
-      errEl.textContent = "";
+      const msgEl = document.getElementById("loginMsg");
+      msgEl.innerHTML = "";
       try {
         const data = await apiFetch("/auth/login", {
           method: "POST",
@@ -87,20 +92,20 @@
         localStorage.setItem("user", JSON.stringify(data.user));
         window.location.href = "dashboard.html";
       } catch (err) {
-        errEl.textContent = err.message;
+        msgEl.innerHTML = `<div class="msg msg-error">${err.message}</div>`;
       }
     }
 
-    async function handleRegister(e) {
+    async function hacerRegistro(e) {
       e.preventDefault();
-      const errEl = document.getElementById("registerError");
-      errEl.textContent = "";
+      const msgEl = document.getElementById("registroMsg");
+      msgEl.innerHTML = "";
       try {
         const data = await apiFetch("/auth/register", {
           method: "POST",
           body: JSON.stringify({
             email: document.getElementById("regEmail").value,
-            full_name: document.getElementById("regName").value,
+            full_name: document.getElementById("regNombre").value,
             password: document.getElementById("regPassword").value,
           }),
         });
@@ -108,7 +113,7 @@
         localStorage.setItem("user", JSON.stringify(data.user));
         window.location.href = "profile.html";
       } catch (err) {
-        errEl.textContent = err.message;
+        msgEl.innerHTML = `<div class="msg msg-error">${err.message}</div>`;
       }
     }
   </script>
