@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import text
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from app.deps import get_db
 from app.security import hash_password, verify_password, create_token
+# SOLID: Dependency Inversion - el router depende de la abstracción UserRepository, no de SQL directo
+from app.repositories.user_repository import UserRepository
 
+# SOLID: Single Responsibility - este router solo gestiona autenticación (login/registro)
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
@@ -21,33 +23,25 @@ class LoginData(BaseModel):
 
 @router.post("/register")
 def register(data: RegisterData, db: Session = Depends(get_db)):
-    existing = db.execute(text("SELECT id FROM users WHERE email = :e"), {"e": data.email}).fetchone()
-    if existing:
+    # GRASP: Controlador - delega la persistencia al UserRepository
+    user_repo = UserRepository(db)
+
+    if user_repo.email_exists(data.email):
         raise HTTPException(status_code=400, detail="El email ya esta registrado")
 
     hashed = hash_password(data.password)
-    db.execute(
-        text("INSERT INTO users (email, full_name, password_hash, is_active) VALUES (:e, :n, :p, 1)"),
-        {"e": data.email, "n": data.full_name, "p": hashed}
-    )
-    db.commit()
-
-    user = db.execute(text("SELECT * FROM users WHERE email = :e"), {"e": data.email}).fetchone()
-    token = create_token(user.id)
-    return {"token": token, "user": {"id": user.id, "email": user.email, "full_name": user.full_name}}
+    user = user_repo.create(data.email, data.full_name, hashed)
+    token = create_token(user["id"])
+    return {"token": token, "user": {"id": user["id"], "email": user["email"], "full_name": user["full_name"]}}
 
 
 @router.post("/login")
 def login(data: LoginData, db: Session = Depends(get_db)):
-    user = db.execute(text("SELECT * FROM users WHERE email = :e"), {"e": data.email}).fetchone()
-    if not user:
+    user_repo = UserRepository(db)
+    user = user_repo.find_by_email(data.email)
+
+    if not user or not verify_password(data.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
 
-    user_dict = dict(user._mapping)
-    password_hash = user_dict.get("password_hash", "")
-
-    if not password_hash or not verify_password(data.password, password_hash):
-        raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
-
-    token = create_token(user.id)
-    return {"token": token, "user": {"id": user.id, "email": user.email, "full_name": user.full_name}}
+    token = create_token(user["id"])
+    return {"token": token, "user": {"id": user["id"], "email": user["email"], "full_name": user["full_name"]}}

@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from typing import Optional
-import json
 from app.deps import get_db
 from app.security import get_current_user
+# SOLID: Dependency Inversion - depende de abstracciones (Repository y Factory)
+from app.repositories.job_repository import JobRepository
+from app.factories.dto_factory import DTOFactory
 
+# SOLID: Single Responsibility - este router solo gestiona el listado y detalle de empleos
 router = APIRouter(prefix="/jobs", tags=["Empleos"])
 
 
@@ -14,36 +16,23 @@ def list_jobs(
     city: Optional[str] = Query(None),
     modality: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
-    query = "SELECT * FROM jobs WHERE 1=1"
-    params = {}
-
-    if city:
-        query += " AND city LIKE :city"
-        params["city"] = f"%{city}%"
-    if modality:
-        query += " AND modality = :modality"
-        params["modality"] = modality
-
-    query += " ORDER BY posted_at DESC LIMIT 50"
-    rows = db.execute(text(query), params).fetchall()
-
-    result = []
-    for row in rows:
-        job = dict(row._mapping)
-        job["skills_required"] = json.loads(job["skills_required"]) if isinstance(job["skills_required"], str) else job["skills_required"] or []
-        result.append(job)
-
-    return result
+    # GRASP: Controlador - delega la consulta al Repository
+    job_repo = JobRepository(db)
+    jobs = job_repo.find_all(city=city, modality=modality)
+    # GRASP: Fabricación Pura - DTOFactory transforma los datos para la respuesta
+    return [DTOFactory.job_dto_to_dict(DTOFactory.create_job_dto(j)) for j in jobs]
 
 
 @router.get("/{job_id}")
-def get_job(job_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    row = db.execute(text("SELECT * FROM jobs WHERE id = :id"), {"id": job_id}).fetchone()
-    if not row:
-        from fastapi import HTTPException
+def get_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    job_repo = JobRepository(db)
+    job = job_repo.find_by_id(job_id)
+    if not job:
         raise HTTPException(status_code=404, detail="Empleo no encontrado")
-    job = dict(row._mapping)
-    job["skills_required"] = json.loads(job["skills_required"]) if isinstance(job["skills_required"], str) else job["skills_required"] or []
-    return job
+    return DTOFactory.job_dto_to_dict(DTOFactory.create_job_dto(job))

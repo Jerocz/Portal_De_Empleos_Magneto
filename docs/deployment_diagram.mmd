@@ -1,0 +1,71 @@
+graph TB
+    subgraph Cliente["🖥️ NODO: Browser (Cliente Web)"]
+        direction TB
+        subgraph Paginas["Páginas HTML"]
+            IndexHTML["index.html\n(Login / Registro)"]
+            DashHTML["dashboard.html\n(Matches y Notificaciones)"]
+            JobsHTML["jobs.html\n(Explorador de Empleos)"]
+            ProfileHTML["profile.html\n(Perfil de Usuario)"]
+        end
+        subgraph ClienteJS["Lógica JavaScript"]
+            ConfigJS["config.js\n- apiFetch()\n- getToken()\n- requireAuth()\n- logout()"]
+            LocalStorage["localStorage\n- token JWT\n- user data"]
+        end
+        CSSStyles["styles.css\n(Diseño Responsive)"]
+    end
+
+    subgraph Servidor["⚙️ NODO: FastAPI Server (Puerto 8000)"]
+        direction TB
+        subgraph ASGI["ASGI: Uvicorn"]
+            FastAPIApp["FastAPI App\n(main.py)"]
+            CORS["CORSMiddleware\n(allow_origins: *)"]
+        end
+        subgraph RoutersLayer["Capa de Routers"]
+            AuthR["/auth\n(registro, login)"]
+            ProfileR["/profile\n(GET, PUT)"]
+            JobsR["/jobs\n(listado, detalle)"]
+            MatchR["/matches\n(run, GET)"]
+            NotifR["/notifications\n(GET)"]
+        end
+        subgraph PatternsLayer["Capa de Patrones"]
+            StrategyLayer["Strategy Pattern\n- CompositeMatchingStrategy\n- SkillMatchingStrategy (60%)\n- SalaryMatchingStrategy (25%)\n- ModalityMatchingStrategy (15%)"]
+            ServiceLayer["Service Layer\n- MatchingService"]
+            RepoLayer["Repository Pattern\n- UserRepository\n- JobRepository\n- MatchRepository\n- ProfileRepository"]
+            FactoryLayer["Factory Pattern\n- DTOFactory\n- UserProfileDTO\n- JobDTO\n- MatchResultDTO"]
+        end
+        subgraph SecurityLayer["Seguridad"]
+            JWTSec["JWT (PyJWT)\nHS256 / 24h"]
+            BcryptSec["bcrypt\n(password hashing)"]
+            OAuth2["OAuth2PasswordBearer"]
+        end
+        StaticFiles["StaticFiles\n(sirve frontend en /)"]
+    end
+
+    subgraph BaseDatos["🗄️ NODO: MySQL Server (Puerto 3306)"]
+        direction TB
+        subgraph Tablas["Tablas"]
+            TUsers[("users\n- id PK\n- email UNIQUE\n- full_name\n- password_hash\n- is_active")]
+            TProfiles[("profiles\n- user_id FK\n- location_city\n- modality\n- salary_min/max_cop\n- years_exp\n- skills JSON")]
+            TJobs[("jobs\n- id PK\n- title\n- company\n- city\n- modality\n- salary_min/max_cop\n- skills_required JSON\n- posted_at")]
+            TMatches[("job_matches\n- id PK\n- user_id FK\n- job_id FK\n- score FLOAT\n- explanation TEXT\n- run_date DATE\n- created_at")]
+        end
+        ORM["SQLAlchemy ORM\n+ PyMySQL driver"]
+    end
+
+    %% Conexiones entre nodos
+    Cliente -- "HTTP REST\nBearer JWT\nJSON" --> Servidor
+    Servidor -- "SQLAlchemy\nPyMySQL\nTCP/IP" --> BaseDatos
+
+    %% Conexiones internas del servidor
+    FastAPIApp --> RoutersLayer
+    FastAPIApp --> CORS
+    FastAPIApp --> StaticFiles
+    RoutersLayer --> PatternsLayer
+    RoutersLayer --> SecurityLayer
+    PatternsLayer --> ORM
+    ORM --> Tablas
+
+    %% Notas de despliegue
+    style Cliente fill:#dbeafe,stroke:#2563eb,color:#1e3a5f
+    style Servidor fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style BaseDatos fill:#fef9c3,stroke:#ca8a04,color:#713f12

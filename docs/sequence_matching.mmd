@@ -1,0 +1,75 @@
+sequenceDiagram
+    actor Usuario
+    participant Browser as Browser (JS)
+    participant Router as FastAPI /matches/run
+    participant Auth as security.get_current_user
+    participant ProfileRepo as ProfileRepository
+    participant Service as MatchingService
+    participant Composite as CompositeMatchingStrategy
+    participant SkillS as SkillMatchingStrategy
+    participant SalaryS as SalaryMatchingStrategy
+    participant ModalityS as ModalityMatchingStrategy
+    participant JobRepo as JobRepository
+    participant MatchRepo as MatchRepository
+    participant DB as MySQL
+
+    Usuario->>Browser: Clic "Buscar Matches"
+    Browser->>Router: POST /matches/run\nAuthorization: Bearer <token>
+
+    Router->>Auth: get_current_user(token)
+    Auth->>DB: SELECT * FROM users WHERE id = ?
+    DB-->>Auth: user row
+    Auth-->>Router: current_user dict
+
+    Router->>ProfileRepo: find_by_user_id(user_id)
+    ProfileRepo->>DB: SELECT * FROM profiles WHERE user_id = ?
+    DB-->>ProfileRepo: profile row (skills, salary, modality)
+    ProfileRepo-->>Router: user_profile dict
+
+    alt perfil sin skills
+        Router-->>Browser: 400 "Completa tu perfil primero"
+    else perfil válido
+        Router->>Service: run_matching(user_id, user_profile)
+
+        Service->>JobRepo: find_all(limit=200)
+        JobRepo->>DB: SELECT * FROM jobs ORDER BY posted_at DESC
+        DB-->>JobRepo: lista de empleos
+        JobRepo-->>Service: list[dict]
+
+        loop Para cada empleo en la lista
+            Service->>Composite: calculate(user_profile, job)
+
+            Composite->>SkillS: calculate(user_profile, job)
+            Note over SkillS: Intersección de skills\nscore = coincidencias / total_job_skills * 100
+            SkillS-->>Composite: (score_skills: float, msg_skills: str)
+
+            Composite->>SalaryS: calculate(user_profile, job)
+            Note over SalaryS: Solapamiento de rangos salariales\nscore = overlap / job_range * 100
+            SalaryS-->>Composite: (score_salary: float, msg_salary: str)
+
+            Composite->>ModalityS: calculate(user_profile, job)
+            Note over ModalityS: Coincidencia exacta = 100\nHybrid parcial = 50\nSin coincidencia = 0
+            ModalityS-->>Composite: (score_modality: float, msg_modality: str)
+
+            Note over Composite: score_final = skills*0.60 + salary*0.25 + modality*0.15
+            Composite-->>Service: (score_final: float, explanation: str)
+
+            alt score_final > 0
+                Service->>MatchRepo: find_by_user_job_date(user_id, job_id, today)
+                MatchRepo->>DB: SELECT id FROM job_matches\nWHERE user_id=? AND job_id=? AND run_date=?
+                DB-->>MatchRepo: None o existing row
+
+                alt match no existe hoy
+                    Service->>MatchRepo: create(user_id, job_id, score, explanation, today)
+                    MatchRepo->>DB: INSERT INTO job_matches ...
+                    DB-->>MatchRepo: OK
+                    Note over Service: nuevos_matches += 1
+                end
+            end
+        end
+
+        Service->>DB: COMMIT
+        Service-->>Router: nuevos_matches (int)
+        Router-->>Browser: 200 {"message": "Matching completado. N nuevos matches encontrados hoy."}
+        Browser-->>Usuario: Muestra resultado en el dashboard
+    end

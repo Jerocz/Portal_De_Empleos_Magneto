@@ -1,0 +1,216 @@
+classDiagram
+    %% =============================================
+    %% CAPA DE ESTRATEGIAS (Patrón Strategy)
+    %% =============================================
+
+    class MatchingStrategy {
+        <<abstract>>
+        +name() str
+        +calculate(user_profile dict, job dict) tuple
+    }
+
+    class SkillMatchingStrategy {
+        +name() str
+        +calculate(user_profile dict, job dict) tuple
+        -_normalize_skills(skills list) set
+    }
+
+    class SalaryMatchingStrategy {
+        +name() str
+        +calculate(user_profile dict, job dict) tuple
+    }
+
+    class ModalityMatchingStrategy {
+        -_PARTIAL_SCORE float
+        +name() str
+        +calculate(user_profile dict, job dict) tuple
+    }
+
+    class CompositeMatchingStrategy {
+        -_strategies list
+        +DEFAULT_WEIGHTS dict
+        +__init__(strategies list)
+        +calculate(user_profile dict, job dict) tuple
+    }
+
+    MatchingStrategy <|-- SkillMatchingStrategy : implements
+    MatchingStrategy <|-- SalaryMatchingStrategy : implements
+    MatchingStrategy <|-- ModalityMatchingStrategy : implements
+    CompositeMatchingStrategy o-- MatchingStrategy : composes
+
+    %% =============================================
+    %% CAPA DE SERVICIO
+    %% =============================================
+
+    class MatchingService {
+        -_job_repo JobRepository
+        -_match_repo MatchRepository
+        -_strategy CompositeMatchingStrategy
+        -_db Session
+        +__init__(db Session, strategy CompositeMatchingStrategy)
+        +run_matching(user_id int, user_profile dict) int
+    }
+
+    MatchingService --> CompositeMatchingStrategy : uses
+    MatchingService --> JobRepository : uses
+    MatchingService --> MatchRepository : uses
+
+    %% =============================================
+    %% CAPA DE REPOSITORIOS (Patrón Repository)
+    %% =============================================
+
+    class UserRepository {
+        -_db Session
+        +__init__(db Session)
+        +find_by_id(user_id int) dict
+        +find_by_email(email str) dict
+        +email_exists(email str) bool
+        +create(email str, full_name str, password_hash str) dict
+    }
+
+    class JobRepository {
+        -_db Session
+        +__init__(db Session)
+        +find_all(city str, modality str, limit int) list
+        +find_by_id(job_id int) dict
+        -_parse_skills(job dict) dict
+    }
+
+    class MatchRepository {
+        -_db Session
+        +__init__(db Session)
+        +find_by_user(user_id int, limit int) list
+        +find_by_user_job_date(user_id int, job_id int, run_date date) dict
+        +create(user_id int, job_id int, score float, explanation str, run_date date) None
+        +find_notifications(user_id int, min_score float, limit int) list
+    }
+
+    class ProfileRepository {
+        -_db Session
+        +__init__(db Session)
+        +find_by_user_id(user_id int) dict
+        +upsert(user_id int, location_city str, modality str, salary_min_cop int, salary_max_cop int, years_exp int, skills list) None
+    }
+
+    %% =============================================
+    %% CAPA DE DTOs Y FACTORY (Patrón Factory)
+    %% =============================================
+
+    class UserProfileDTO {
+        +id int
+        +email str
+        +full_name str
+        +location_city str
+        +modality str
+        +salary_min_cop int
+        +salary_max_cop int
+        +years_exp int
+        +skills list
+    }
+
+    class JobDTO {
+        +id int
+        +title str
+        +company str
+        +city str
+        +modality str
+        +salary_min_cop int
+        +salary_max_cop int
+        +skills_required list
+        +description str
+    }
+
+    class MatchResultDTO {
+        +id int
+        +job_id int
+        +title str
+        +company str
+        +city str
+        +modality str
+        +score float
+        +explanation str
+        +run_date str
+        +salary_min_cop int
+        +salary_max_cop int
+        +skills_required list
+    }
+
+    class DTOFactory {
+        +create_user_profile_dto(user dict, profile dict) UserProfileDTO
+        +create_job_dto(job dict) JobDTO
+        +create_match_result_dto(match dict) MatchResultDTO
+        +user_profile_dto_to_dict(dto UserProfileDTO) dict
+        +job_dto_to_dict(dto JobDTO) dict
+        +match_dto_to_dict(dto MatchResultDTO) dict
+    }
+
+    DTOFactory ..> UserProfileDTO : creates
+    DTOFactory ..> JobDTO : creates
+    DTOFactory ..> MatchResultDTO : creates
+
+    %% =============================================
+    %% CAPA DE SEGURIDAD
+    %% =============================================
+
+    class SecurityModule {
+        <<module>>
+        +SECRET_KEY str
+        +ALGORITHM str
+        +TOKEN_EXPIRE_HOURS int
+        +hash_password(password str) str
+        +verify_password(plain str, hashed str) bool
+        +create_token(user_id int) str
+        +get_current_user(token str, db Session) dict
+    }
+
+    %% =============================================
+    %% CAPA DE ROUTERS (Patrón Decorator de FastAPI)
+    %% =============================================
+
+    class AuthRouter {
+        <<FastAPI Router>>
+        +prefix /auth
+        +register(data RegisterData, db Session) dict
+        +login(data LoginData, db Session) dict
+    }
+
+    class ProfileRouter {
+        <<FastAPI Router>>
+        +prefix /profile
+        +get_profile(current_user dict, db Session) dict
+        +update_profile(data ProfileUpdate, current_user dict, db Session) dict
+    }
+
+    class JobsRouter {
+        <<FastAPI Router>>
+        +prefix /jobs
+        +list_jobs(city str, modality str, db Session, current_user dict) list
+        +get_job(job_id int, db Session, current_user dict) dict
+    }
+
+    class MatchingRouter {
+        <<FastAPI Router>>
+        +prefix /matches
+        +run_matching(current_user dict, db Session) dict
+        +get_my_matches(current_user dict, db Session) list
+    }
+
+    class NotificationsRouter {
+        <<FastAPI Router>>
+        +prefix /notifications
+        +SCORE_MINIMO int
+        +get_notifications(current_user dict, db Session) dict
+    }
+
+    AuthRouter --> UserRepository : uses
+    ProfileRouter --> ProfileRepository : uses
+    ProfileRouter --> DTOFactory : uses
+    JobsRouter --> JobRepository : uses
+    JobsRouter --> DTOFactory : uses
+    MatchingRouter --> MatchingService : uses
+    MatchingRouter --> MatchRepository : uses
+    MatchingRouter --> ProfileRepository : uses
+    MatchingRouter --> DTOFactory : uses
+    NotificationsRouter --> MatchRepository : uses
+    AuthRouter --> SecurityModule : uses
+    MatchingRouter --> SecurityModule : uses
