@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Magneto — Panel de Empresa</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="styles.css?v=2" />
+</head>
+<body>
+
+  <!-- ▸ APP NAVBAR -->
+  <nav class="app-nav">
+    <a href="employer_dashboard.html" class="app-brand">
+      <div class="app-logo"><i class="fas fa-briefcase"></i></div>
+      <span class="app-brand-name">Mag<span>neto</span></span>
+    </a>
+    <div class="app-links">
+      <a href="employer_dashboard.html" class="active"><i class="fas fa-building"></i> <span>Mis Vacantes</span></a>
+      <button class="btn-logout" onclick="logout()"><i class="fas fa-right-from-bracket"></i> Salir</button>
+    </div>
+  </nav>
+
+  <div class="app-container">
+
+    <!-- Welcome banner -->
+    <div class="welcome-banner employer-banner">
+      <div class="welcome-text">
+        <h2 id="saludo">Panel de Empresa</h2>
+        <p id="welcome-sub">Publica vacantes y gestiona tus ofertas activas</p>
+      </div>
+      <span class="employer-badge"><i class="fas fa-building"></i> Contratante</span>
+    </div>
+
+    <!-- ▸ FORM: publicar vacante -->
+    <div class="card" id="publishSection">
+      <div class="section-label" style="margin-bottom:20px">
+        <i class="fas fa-plus-circle" style="color:var(--teal-mid)"></i> Publicar nueva vacante
+      </div>
+
+      <div id="publishMsg"></div>
+
+      <form onsubmit="publicarEmpleo(event)">
+        <div class="form-grid">
+          <div class="field">
+            <label><i class="fas fa-id-badge"></i> &nbsp;Título del cargo *</label>
+            <input type="text" id="jobTitle" placeholder="Ej: Desarrollador Full Stack" required />
+          </div>
+          <div class="field">
+            <label><i class="fas fa-building"></i> &nbsp;Empresa *</label>
+            <input type="text" id="jobCompany" placeholder="Ej: TechCorp S.A.S" required />
+          </div>
+          <div class="field">
+            <label><i class="fas fa-location-dot"></i> &nbsp;Ciudad</label>
+            <input type="text" id="jobCity" placeholder="Ej: Medellín, Bogotá" />
+          </div>
+          <div class="field">
+            <label><i class="fas fa-laptop-house"></i> &nbsp;Modalidad</label>
+            <select id="jobModality">
+              <option value="">— Selecciona —</option>
+              <option value="remote">🌐 Remoto</option>
+              <option value="hybrid">🔀 Híbrido</option>
+              <option value="on-site">🏢 Presencial</option>
+            </select>
+          </div>
+          <div class="field">
+            <label><i class="fas fa-peso-sign"></i> &nbsp;Salario mínimo (COP)</label>
+            <input type="number" id="jobSalMin" placeholder="Ej: 3000000" min="0" step="100000" />
+          </div>
+          <div class="field">
+            <label><i class="fas fa-peso-sign"></i> &nbsp;Salario máximo (COP)</label>
+            <input type="number" id="jobSalMax" placeholder="Ej: 8000000" min="0" step="100000" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label><i class="fas fa-align-left"></i> &nbsp;Descripción del cargo</label>
+          <textarea id="jobDesc" rows="3" placeholder="Describe responsabilidades, requisitos y beneficios del cargo..."></textarea>
+        </div>
+
+        <div class="field">
+          <label><i class="fas fa-code"></i> &nbsp;Habilidades requeridas — <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--t3)">Escribe y presiona Enter o coma</span></label>
+          <div class="skills-area" onclick="document.getElementById('skillInput').focus()">
+            <div id="skillTags" style="display:contents"></div>
+            <input type="text" id="skillInput" placeholder="python, react, sql..." onkeydown="agregarSkill(event)" />
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="margin-top:8px">
+          <i class="fas fa-paper-plane"></i> Publicar vacante
+        </button>
+      </form>
+    </div>
+
+    <!-- ▸ MIS VACANTES -->
+    <div class="section-label" style="margin: 28px 0 16px">
+      <i class="fas fa-list-check" style="color:var(--teal-mid)"></i> Mis vacantes publicadas
+    </div>
+
+    <div id="myJobsContainer">
+      <p class="text-muted"><i class="fas fa-spinner fa-spin"></i> &nbsp;Cargando...</p>
+    </div>
+
+  </div>
+
+  <script src="config.js"></script>
+  <script>
+    requireAuth();
+    const user = getUser();
+    if (user && user.role !== "employer") window.location.href = "dashboard.html";
+
+    if (user) {
+      const nombre = user.full_name.split(" ")[0];
+      document.getElementById("saludo").textContent = `Hola, ${nombre}`;
+    }
+
+    let skills = [];
+
+    function mostrarSkills() {
+      document.getElementById("skillTags").innerHTML = skills.map((s, i) => `
+        <span class="skill-tag">${s} <button type="button" onclick="quitarSkill(${i})">&times;</button></span>
+      `).join("");
+    }
+
+    function quitarSkill(i) {
+      skills.splice(i, 1);
+      mostrarSkills();
+    }
+
+    function agregarSkill(e) {
+      if (e.key === "Enter" || e.key === ",") {
+        e.preventDefault();
+        const input = document.getElementById("skillInput");
+        const val = input.value.trim().replace(/,$/, "").toLowerCase();
+        if (val && !skills.includes(val)) {
+          skills.push(val);
+          mostrarSkills();
+        }
+        input.value = "";
+      }
+    }
+
+    function badgeMod(m) {
+      const map = {
+        remote:    `<span class="badge badge-remote"><i class="fas fa-wifi"></i> Remoto</span>`,
+        hybrid:    `<span class="badge badge-hybrid"><i class="fas fa-arrows-left-right"></i> Híbrido</span>`,
+        "on-site": `<span class="badge badge-onsite"><i class="fas fa-building"></i> Presencial</span>`,
+      };
+      return map[m] || (m ? `<span class="badge">${m}</span>` : "");
+    }
+
+    function formatSalary(min, max) {
+      if (!min && !max) return null;
+      const fmt = n => n.toLocaleString("es-CO");
+      if (min && max) return `$${fmt(min)} – $${fmt(max)} COP`;
+      if (min) return `Desde $${fmt(min)} COP`;
+      return `Hasta $${fmt(max)} COP`;
+    }
+
+    async function publicarEmpleo(e) {
+      e.preventDefault();
+      const msgEl = document.getElementById("publishMsg");
+      msgEl.innerHTML = `<div class="msg msg-info"><i class="fas fa-spinner fa-spin"></i> Publicando vacante...</div>`;
+
+      try {
+        await apiFetch("/jobs/", {
+          method: "POST",
+          body: JSON.stringify({
+            title:          document.getElementById("jobTitle").value,
+            company:        document.getElementById("jobCompany").value,
+            city:           document.getElementById("jobCity").value || null,
+            modality:       document.getElementById("jobModality").value || null,
+            description:    document.getElementById("jobDesc").value || null,
+            salary_min_cop: parseInt(document.getElementById("jobSalMin").value) || null,
+            salary_max_cop: parseInt(document.getElementById("jobSalMax").value) || null,
+            skills_required: skills,
+          }),
+        });
+
+        msgEl.innerHTML = `<div class="msg msg-success"><i class="fas fa-circle-check"></i> Vacante publicada correctamente</div>`;
+        // Reset form
+        e.target.reset();
+        skills = [];
+        mostrarSkills();
+        setTimeout(() => msgEl.innerHTML = "", 3000);
+        cargarMisEmpleos();
+      } catch (err) {
+        msgEl.innerHTML = `<div class="msg msg-error"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
+      }
+    }
+
+    async function cargarMisEmpleos() {
+      const cont = document.getElementById("myJobsContainer");
+      try {
+        const jobs = await apiFetch("/jobs/my-jobs");
+
+        const n = jobs.length;
+        document.getElementById("welcome-sub").textContent =
+          n > 0 ? `Tienes ${n} vacante${n > 1 ? "s" : ""} publicada${n > 1 ? "s" : ""}` : "Aún no has publicado vacantes";
+
+        if (n === 0) {
+          cont.innerHTML = `
+            <div class="empty-state">
+              <span class="empty-icon">📋</span>
+              <h3>Sin vacantes publicadas</h3>
+              <p>Usa el formulario de arriba para publicar tu primera oferta de empleo.</p>
+            </div>`;
+          return;
+        }
+
+        cont.innerHTML = `<div class="jobs-grid">${jobs.map(j => {
+          const salary = formatSalary(j.salary_min_cop, j.salary_max_cop);
+          return `
+            <div class="job-card">
+              <div class="job-card-top">
+                <div class="job-avatar">${j.company.charAt(0).toUpperCase()}</div>
+                <div class="job-main">
+                  <h3>${j.title}</h3>
+                  <span class="job-company"><i class="fas fa-building"></i> ${j.company}</span>
+                </div>
+              </div>
+              <div class="job-details">
+                ${j.city ? `<span><i class="fas fa-location-dot"></i> ${j.city}</span>` : ""}
+                ${badgeMod(j.modality)}
+              </div>
+              ${j.description ? `<p class="job-desc">${j.description}</p>` : ""}
+              ${(j.skills_required || []).length > 0 ? `
+                <div class="skills-row">
+                  ${j.skills_required.map(s => `<span class="skill-tag">${s}</span>`).join("")}
+                </div>` : ""}
+              <div class="job-card-footer">
+                ${salary ? `<p class="job-salary"><i class="fas fa-peso-sign"></i> ${salary}</p>` : `<span></span>`}
+                <span class="employer-job-tag"><i class="fas fa-circle-check"></i> Publicado</span>
+              </div>
+            </div>`;
+        }).join("")}</div>`;
+      } catch (err) {
+        cont.innerHTML = `<div class="msg msg-error"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
+      }
+    }
+
+    cargarMisEmpleos();
+  </script>
+</body>
+</html>

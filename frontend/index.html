@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Magneto — Portal de Empleos</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=2" />
 </head>
 <body>
 
@@ -26,31 +26,111 @@
     </div>
   </nav>
 
-  <!-- ▸ HERO -->
-  <section class="hero">
-    <div class="hero-content">
-      <div class="hero-badge">
-        <i class="fas fa-bolt"></i> Portal de Empleos Colombia
+  <!-- ▸ HERO (nuevo estilo tipo plantilla moderna) -->
+  <section class="hero hero-modern">
+    <div class="hero-inner">
+
+      <div class="hero-left">
+        <div class="hero-badge">
+          <i class="fas fa-bolt"></i> Portal de Empleos Colombia
+        </div>
+
+        <h1>
+          <span class="hero-big">3,000+</span>
+          <span class="hero-title">Vacantes para ti</span>
+        </h1>
+
+        <p>
+          Encuentra empleos, oportunidades de carrera y compañías reales.
+          Postúlate en minutos con un perfil profesional.
+        </p>
+
+        <!-- Search bar visual (no cambia funcionalidad) -->
+        <div class="hero-search">
+          <div class="hs-field">
+            <i class="fas fa-magnifying-glass"></i>
+            <input type="text" placeholder="Buscar por cargo, palabra clave o empresa" disabled />
+          </div>
+          <div class="hs-field small">
+            <i class="fas fa-location-dot"></i>
+            <span>Colombia</span>
+          </div>
+          <div class="hs-field small">
+            <i class="fas fa-layer-group"></i>
+            <span>Todas las categorías</span>
+          </div>
+          <button class="hs-btn" type="button" onclick="scrollToAuth('registro')">
+            Buscar
+          </button>
+        </div>
+
+        <div class="hero-tags">
+          <span class="ht-label">Búsquedas populares:</span>
+          <span class="ht-tag">Desarrollador</span>
+          <span class="ht-tag">Marketing</span>
+          <span class="ht-tag">Ventas</span>
+          <span class="ht-tag">Diseño</span>
+          <span class="ht-tag">Data</span>
+        </div>
+
+        <div class="hero-features">
+          <div class="hf-card">
+            <i class="fas fa-briefcase"></i>
+            <div>
+              <strong>Empleos reales</strong>
+              <span>Ofertas verificadas</span>
+            </div>
+          </div>
+          <div class="hf-card">
+            <i class="fas fa-paper-plane"></i>
+            <div>
+              <strong>Postulación rápida</strong>
+              <span>En minutos</span>
+            </div>
+          </div>
+          <div class="hf-card">
+            <i class="fas fa-building"></i>
+            <div>
+              <strong>Top empresas</strong>
+              <span>Contratando hoy</span>
+            </div>
+          </div>
+          <div class="hf-card">
+            <i class="fas fa-shield"></i>
+            <div>
+              <strong>Seguridad</strong>
+              <span>Datos protegidos</span>
+            </div>
+          </div>
+        </div>
       </div>
-      <h1>Encuentra el trabajo<br /><em>ideal para ti</em></h1>
-      <p>Conectamos talento con oportunidades reales. Analiza tu compatibilidad con cientos de empleos en segundos.</p>
-      <div class="hero-stats">
-        <div class="hero-stat">
-          <strong>500+</strong>
-          <span>Empleos activos</span>
-        </div>
-        <div class="hero-divider"></div>
-        <div class="hero-stat">
-          <strong>200+</strong>
-          <span>Empresas</span>
-        </div>
-        <div class="hero-divider"></div>
-        <div class="hero-stat">
-          <strong>98%</strong>
-          <span>Satisfacción</span>
+
+      <div class="hero-right">
+        <div class="hero-phone">
+          <div class="phone-top">
+            <div class="phone-camera"></div>
+          </div>
+          <div class="phone-screen">
+            <div class="phone-logo">
+              <div class="phone-logo-icon"><i class="fas fa-briefcase"></i></div>
+              <span>Magneto</span>
+            </div>
+            <div class="phone-title">
+              <strong>3,000+</strong>
+              <span>Vacantes</span>
+            </div>
+            <div class="phone-search">
+              <div class="phone-input"><i class="fas fa-magnifying-glass"></i> Buscar empleo</div>
+              <div class="phone-input"><i class="fas fa-location-dot"></i> Medellín</div>
+              <div class="phone-input"><i class="fas fa-layer-group"></i> Categorías</div>
+              <div class="phone-btn">Buscar</div>
+            </div>
+          </div>
         </div>
       </div>
+
     </div>
+
     <div class="hero-wave">
       <svg viewBox="0 0 1440 64" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M0,32 C240,64 480,0 720,32 C960,64 1200,0 1440,32 L1440,64 L0,64 Z" fill="#F0F8FA"/>
@@ -106,26 +186,60 @@
           </form>
         </div>
 
-        <!-- Registro -->
+        <!-- Registro: Paso 1 — elegir tipo de cuenta -->
         <div id="tabRegistro" class="hidden">
-          <div id="registroMsg"></div>
-          <form onsubmit="hacerRegistro(event)">
-            <div class="field">
-              <label><i class="fas fa-user"></i> &nbsp;Nombre completo</label>
-              <input type="text" id="regNombre" placeholder="Juan Pérez" required autocomplete="name" />
+
+          <div id="stepRol">
+            <p style="text-align:center;font-size:14px;color:var(--t3);margin-bottom:20px">¿Qué tipo de cuenta quieres crear?</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:8px">
+
+              <div onclick="elegirRol('employee')" style="cursor:pointer;border:2px solid var(--border);border-radius:16px;padding:24px 16px;text-align:center;transition:all .2s" onmouseover="this.style.borderColor='var(--teal-mid)';this.style.background='var(--teal-pale)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='white'">
+                <div style="width:52px;height:52px;border-radius:14px;background:var(--teal-pale);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px;color:var(--teal-mid)">
+                  <i class="fas fa-user"></i>
+                </div>
+                <strong style="display:block;font-size:14px;color:var(--navy);margin-bottom:4px">Busco empleo</strong>
+                <span style="font-size:12px;color:var(--t3)">Encuentra trabajo y ve tu compatibilidad</span>
+              </div>
+
+              <div onclick="elegirRol('employer')" style="cursor:pointer;border:2px solid var(--border);border-radius:16px;padding:24px 16px;text-align:center;transition:all .2s" onmouseover="this.style.borderColor='var(--teal-mid)';this.style.background='var(--teal-pale)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='white'">
+                <div style="width:52px;height:52px;border-radius:14px;background:var(--teal-pale);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px;color:var(--teal-mid)">
+                  <i class="fas fa-building"></i>
+                </div>
+                <strong style="display:block;font-size:14px;color:var(--navy);margin-bottom:4px">Publico empleos</strong>
+                <span style="font-size:12px;color:var(--t3)">Publica vacantes y encuentra candidatos</span>
+              </div>
+
             </div>
-            <div class="field">
-              <label><i class="fas fa-envelope"></i> &nbsp;Correo electrónico</label>
-              <input type="email" id="regEmail" placeholder="correo@ejemplo.com" required autocomplete="email" />
-            </div>
-            <div class="field">
-              <label><i class="fas fa-lock"></i> &nbsp;Contraseña</label>
-              <input type="password" id="regPassword" placeholder="Mínimo 6 caracteres" minlength="6" required autocomplete="new-password" />
-            </div>
-            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px">
-              <i class="fas fa-user-plus"></i> Crear cuenta
-            </button>
-          </form>
+          </div>
+
+          <!-- Paso 2 — formulario -->
+          <div id="stepForm" style="display:none">
+            <div id="rolSeleccionadoLabel" style="display:flex;align-items:center;gap:8px;background:var(--teal-pale);border:1px solid var(--teal-border);border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:13px;font-weight:600;color:var(--teal-mid)"></div>
+            <div id="registroMsg"></div>
+            <form onsubmit="hacerRegistro(event)">
+              <div class="field">
+                <label><i class="fas fa-user"></i> &nbsp;Nombre completo</label>
+                <input type="text" id="regNombre" placeholder="Juan Pérez" required autocomplete="name" />
+              </div>
+              <div class="field">
+                <label><i class="fas fa-envelope"></i> &nbsp;Correo electrónico</label>
+                <input type="email" id="regEmail" placeholder="correo@ejemplo.com" required autocomplete="email" />
+              </div>
+              <div class="field">
+                <label><i class="fas fa-lock"></i> &nbsp;Contraseña</label>
+                <input type="password" id="regPassword" placeholder="Mínimo 6 caracteres" minlength="6" required autocomplete="new-password" />
+              </div>
+              <div style="display:flex;gap:10px;margin-top:8px">
+                <button type="button" onclick="volverRol()" style="flex:0 0 auto;padding:12px 16px;border:1.5px solid var(--border);border-radius:10px;background:white;cursor:pointer;font-size:13px;color:var(--t3)">
+                  <i class="fas fa-arrow-left"></i>
+                </button>
+                <button type="submit" class="btn btn-primary" style="flex:1;justify-content:center;padding:12px">
+                  <i class="fas fa-user-plus"></i> Crear cuenta
+                </button>
+              </div>
+            </form>
+          </div>
+
         </div>
       </div>
 
@@ -229,9 +343,12 @@
     <p>&copy; 2025 <strong>Magneto</strong> — Portal de Empleos Colombia. Todos los derechos reservados.</p>
   </footer>
 
-  <script src="config.js"></script>
+  <script src="config.js?v=2"></script>
   <script>
-    if (getToken()) window.location.href = "dashboard.html";
+    if (getToken()) {
+      const u = getUser();
+      window.location.href = (u && u.role === "employer") ? "employer_dashboard.html" : "dashboard.html";
+    }
 
     // Navbar scroll effect
     const nav = document.getElementById("landingNav");
@@ -257,6 +374,22 @@
       }
     }
 
+    let selectedRole = "employee";
+
+    function elegirRol(role) {
+      selectedRole = role;
+      document.getElementById("stepRol").style.display = "none";
+      document.getElementById("stepForm").style.display = "block";
+      document.getElementById("rolSeleccionadoLabel").innerHTML = role === "employer"
+        ? '<i class="fas fa-building"></i> Cuenta de contratante'
+        : '<i class="fas fa-user"></i> Cuenta de empleado';
+    }
+
+    function volverRol() {
+      document.getElementById("stepForm").style.display = "none";
+      document.getElementById("stepRol").style.display = "block";
+    }
+
     async function hacerLogin(e) {
       e.preventDefault();
       const msgEl = document.getElementById("loginMsg");
@@ -271,7 +404,7 @@
         });
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
-        window.location.href = "dashboard.html";
+        window.location.href = data.user.role === "employer" ? "employer_dashboard.html" : "dashboard.html";
       } catch (err) {
         msgEl.innerHTML = `<div class="msg msg-error"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
       }
@@ -288,11 +421,12 @@
             email: document.getElementById("regEmail").value,
             full_name: document.getElementById("regNombre").value,
             password: document.getElementById("regPassword").value,
+            role: selectedRole,
           }),
         });
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
-        window.location.href = "profile.html";
+        window.location.href = data.user.role === "employer" ? "employer_dashboard.html" : "profile.html";
       } catch (err) {
         msgEl.innerHTML = `<div class="msg msg-error"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
       }

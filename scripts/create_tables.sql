@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
     email         VARCHAR(255) NOT NULL UNIQUE,
     full_name     VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    role          VARCHAR(20)  NOT NULL DEFAULT 'employee',  -- employee | employer
     is_active     TINYINT(1)   NOT NULL DEFAULT 1,
     created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -45,7 +46,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     salary_min_cop INT,
     salary_max_cop INT,
     skills_required JSON,               -- ["python", "docker", ...]
-    posted_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    posted_by      INT NULL,
+    posted_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (posted_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ──────────────────────────────────────────
