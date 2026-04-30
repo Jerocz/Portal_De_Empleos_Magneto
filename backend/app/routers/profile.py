@@ -14,7 +14,7 @@ router = APIRouter(prefix="/profile", tags=["Perfil"])
 
 class ProfileUpdate(BaseModel):
     location_city: Optional[str] = None
-    modality: Optional[str] = None  # remote, hybrid, on-site
+    modality: Optional[str] = None  # remote, hybrid, presencial
     salary_min_cop: Optional[int] = None
     salary_max_cop: Optional[int] = None
     years_exp: Optional[int] = None
@@ -48,3 +48,14 @@ def update_profile(
         skills=data.skills or [],
     )
     return {"message": "Perfil actualizado correctamente"}
+
+
+@router.delete("/")
+def delete_account(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository(db)
+    user_repo.delete(current_user["id"])
+    return {"message": "Cuenta eliminada correctamente"}

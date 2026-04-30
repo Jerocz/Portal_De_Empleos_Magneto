@@ -17,6 +17,7 @@
     </a>
     <div class="app-links">
       <a href="employer_dashboard.html" class="active"><i class="fas fa-building"></i> <span>Mis Vacantes</span></a>
+      <a href="#inboxSection" onclick="toggleInbox()"><i class="fas fa-inbox"></i> <span>Postulaciones</span> <span id="inboxBadge" style="display:none;background:#dc2626;color:white;border-radius:999px;font-size:11px;padding:1px 7px;margin-left:2px"></span></a>
       <button class="btn-logout" onclick="logout()"><i class="fas fa-right-from-bracket"></i> Salir</button>
     </div>
   </nav>
@@ -60,7 +61,7 @@
               <option value="">— Selecciona —</option>
               <option value="remote">🌐 Remoto</option>
               <option value="hybrid">🔀 Híbrido</option>
-              <option value="on-site">🏢 Presencial</option>
+              <option value="presencial">🏢 Presencial</option>
             </select>
           </div>
           <div class="field">
@@ -99,6 +100,17 @@
 
     <div id="myJobsContainer">
       <p class="text-muted"><i class="fas fa-spinner fa-spin"></i> &nbsp;Cargando...</p>
+    </div>
+
+    <!-- ▸ BANDEJA DE POSTULACIONES -->
+    <div id="inboxSection" style="display:none;margin-top:32px">
+      <div class="section-label" style="margin-bottom:16px">
+        <i class="fas fa-inbox" style="color:var(--teal-mid)"></i> Postulaciones recibidas
+        <span id="inboxCount" style="font-size:13px;font-weight:400;color:var(--t3);margin-left:8px"></span>
+      </div>
+      <div id="inboxContainer">
+        <p class="text-muted"><i class="fas fa-spinner fa-spin"></i> &nbsp;Cargando...</p>
+      </div>
     </div>
 
   </div>
@@ -144,7 +156,7 @@
       const map = {
         remote:    `<span class="badge badge-remote"><i class="fas fa-wifi"></i> Remoto</span>`,
         hybrid:    `<span class="badge badge-hybrid"><i class="fas fa-arrows-left-right"></i> Híbrido</span>`,
-        "on-site": `<span class="badge badge-onsite"><i class="fas fa-building"></i> Presencial</span>`,
+        "presencial": `<span class="badge badge-onsite"><i class="fas fa-building"></i> Presencial</span>`,
       };
       return map[m] || (m ? `<span class="badge">${m}</span>` : "");
     }
@@ -231,6 +243,7 @@
               <div class="job-card-footer">
                 ${salary ? `<p class="job-salary"><i class="fas fa-peso-sign"></i> ${salary}</p>` : `<span></span>`}
                 <span class="employer-job-tag"><i class="fas fa-circle-check"></i> Publicado</span>
+                <button onclick="eliminarVacante(${j.id}, this)" style="background:none;border:1px solid #fca5a5;color:#dc2626;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px;transition:all .2s" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'"><i class="fas fa-trash-can"></i> Eliminar</button>
               </div>
             </div>`;
         }).join("")}</div>`;
@@ -239,7 +252,139 @@
       }
     }
 
+    async function eliminarVacante(jobId, btn) {
+      if (!confirm("¿Seguro que quieres eliminar esta vacante? Esta acción no se puede deshacer.")) return;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      try {
+        await apiFetch(`/jobs/${jobId}`, { method: "DELETE" });
+        const card = btn.closest(".job-card");
+        card.style.transition = "opacity .3s, transform .3s";
+        card.style.opacity = "0";
+        card.style.transform = "scale(0.95)";
+        setTimeout(() => { card.remove(); cargarMisEmpleos(); }, 300);
+      } catch (err) {
+        alert("Error al eliminar: " + err.message);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-trash-can"></i> Eliminar';
+      }
+    }
+
+    // ── Bandeja de postulaciones ──
+    function toggleInbox() {
+      const sec = document.getElementById("inboxSection");
+      const visible = sec.style.display !== "none";
+      sec.style.display = visible ? "none" : "block";
+      if (!visible) cargarInbox();
+    }
+
+    function statusBadge(status) {
+      const map = {
+        pending:  `<span style="background:#fef3c7;color:#d97706;border-radius:7px;padding:3px 9px;font-size:11px;font-weight:600">⏳ Pendiente</span>`,
+        seen:     `<span style="background:#dbeafe;color:#1d4ed8;border-radius:7px;padding:3px 9px;font-size:11px;font-weight:600">👀 Visto</span>`,
+        rejected: `<span style="background:#fee2e2;color:#dc2626;border-radius:7px;padding:3px 9px;font-size:11px;font-weight:600">✗ Rechazado</span>`,
+      };
+      return map[status] || status;
+    }
+
+    async function cambiarEstado(appId, status, btn) {
+      btn.disabled = true;
+      try {
+        await apiFetch(`/applications/${appId}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status }),
+        });
+        cargarInbox();
+      } catch (err) {
+        alert(err.message);
+        btn.disabled = false;
+      }
+    }
+
+    async function cargarInbox() {
+      const cont = document.getElementById("inboxContainer");
+      cont.innerHTML = `<p class="text-muted"><i class="fas fa-spinner fa-spin"></i> &nbsp;Cargando...</p>`;
+      try {
+        const apps = await apiFetch("/applications/inbox");
+
+        // Badge en navbar
+        const badge = document.getElementById("inboxBadge");
+        const pending = apps.filter(a => a.status === "pending").length;
+        badge.style.display = pending > 0 ? "inline" : "none";
+        badge.textContent = pending;
+
+        document.getElementById("inboxCount").textContent =
+          apps.length > 0 ? `(${apps.length} postulación${apps.length > 1 ? "es" : ""})` : "";
+
+        if (apps.length === 0) {
+          cont.innerHTML = `
+            <div class="empty-state">
+              <span class="empty-icon">📬</span>
+              <h3>Sin postulaciones todavía</h3>
+              <p>Cuando un empleado se postule a tus vacantes, aparecerá aquí.</p>
+            </div>`;
+          return;
+        }
+
+        // Agrupar por vacante
+        const byJob = {};
+        apps.forEach(a => {
+          if (!byJob[a.job_id]) byJob[a.job_id] = { title: a.job_title, company: a.company, apps: [] };
+          byJob[a.job_id].apps.push(a);
+        });
+
+        cont.innerHTML = Object.entries(byJob).map(([jobId, group]) => `
+          <div style="border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px">
+            <div style="background:var(--teal-pale);padding:12px 18px;border-bottom:1px solid var(--teal-border)">
+              <strong style="color:var(--navy);font-size:14px"><i class="fas fa-briefcase" style="color:var(--teal-mid)"></i> ${group.title}</strong>
+              <span style="font-size:12px;color:var(--t3);margin-left:8px">${group.company} · ${group.apps.length} candidato${group.apps.length > 1 ? "s" : ""}</span>
+            </div>
+            ${group.apps.map(a => `
+              <div style="padding:16px 18px;border-bottom:1px solid var(--border);background:white">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+                  <div>
+                    <strong style="color:var(--navy);font-size:14px"><i class="fas fa-user-circle" style="color:var(--teal-mid)"></i> ${a.candidate_name}</strong>
+                    <span style="display:block;font-size:12px;color:var(--t3);margin-top:2px"><i class="fas fa-envelope"></i> ${a.candidate_email}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    ${statusBadge(a.status)}
+                    <span style="font-size:11px;color:var(--t4)">${new Date(a.applied_at).toLocaleDateString("es-CO")}</span>
+                  </div>
+                </div>
+
+                <!-- Info del perfil del candidato -->
+                <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px">
+                  ${a.location_city ? `<span style="font-size:12px;color:var(--t3)"><i class="fas fa-location-dot"></i> ${a.location_city}</span>` : ""}
+                  ${a.candidate_modality ? `<span style="font-size:12px;color:var(--t3)"><i class="fas fa-laptop-house"></i> ${a.candidate_modality}</span>` : ""}
+                  ${a.years_exp ? `<span style="font-size:12px;color:var(--t3)"><i class="fas fa-briefcase"></i> ${a.years_exp} año${a.years_exp > 1 ? "s" : ""} exp.</span>` : ""}
+                  ${a.candidate_sal_min ? `<span style="font-size:12px;color:var(--t3)"><i class="fas fa-peso-sign"></i> ${(a.candidate_sal_min/1000).toFixed(0)}K – ${a.candidate_sal_max ? (a.candidate_sal_max/1000).toFixed(0)+"K" : "?"} COP</span>` : ""}
+                </div>
+
+                ${(a.skills || []).length > 0 ? `
+                  <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
+                    ${a.skills.map(s => `<span class="skill-tag">${s}</span>`).join("")}
+                  </div>` : ""}
+
+                ${a.message ? `<blockquote style="margin:10px 0 0;padding:8px 12px;border-left:3px solid var(--teal-mid);background:var(--teal-pale);border-radius:0 8px 8px 0;font-size:13px;color:var(--t2);font-style:italic">${a.message}</blockquote>` : ""}
+
+                <!-- Acciones -->
+                <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+                  ${a.status !== "seen" ? `<button onclick="cambiarEstado(${a.application_id},'seen',this)" style="background:#dbeafe;color:#1d4ed8;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600"><i class="fas fa-eye"></i> Marcar visto</button>` : ""}
+                  ${a.status !== "rejected" ? `<button onclick="cambiarEstado(${a.application_id},'rejected',this)" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600"><i class="fas fa-xmark"></i> Rechazar</button>` : ""}
+                  ${a.status !== "pending" ? `<button onclick="cambiarEstado(${a.application_id},'pending',this)" style="background:#f3f4f6;color:#6b7280;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600"><i class="fas fa-rotate-left"></i> Pendiente</button>` : ""}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `).join("");
+
+      } catch (err) {
+        cont.innerHTML = `<div class="msg msg-error"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
+      }
+    }
+
     cargarMisEmpleos();
+    cargarInbox();
   </script>
 </body>
 </html>

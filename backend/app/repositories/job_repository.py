@@ -89,3 +89,12 @@ class JobRepository:
             {"uid": user_id},
         ).fetchall()
         return [self._parse_skills(dict(r._mapping)) for r in rows]
+
+    def delete(self, job_id: int, owner_id: int) -> bool:
+        """Elimina un empleo solo si pertenece al owner. Retorna True si se borró."""
+        result = self._db.execute(
+            text("DELETE FROM jobs WHERE id = :id AND posted_by = :owner"),
+            {"id": job_id, "owner": owner_id},
+        )
+        self._db.commit()
+        return result.rowcount > 0

@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS profiles (
     user_id        INT          PRIMARY KEY,
     location_city  VARCHAR(100),
-    modality       VARCHAR(20),          -- remote | hybrid | on-site
+    modality       VARCHAR(30),          -- remote | hybrid | presencial
     salary_min_cop INT,
     salary_max_cop INT,
     years_exp      INT,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     title          VARCHAR(255) NOT NULL,
     company        VARCHAR(255) NOT NULL,
     city           VARCHAR(100),
-    modality       VARCHAR(20),          -- remote | hybrid | on-site
+    modality       VARCHAR(30),          -- remote | hybrid | presencial
     description    TEXT,
     salary_min_cop INT,
     salary_max_cop INT,
@@ -69,3 +69,20 @@ CREATE TABLE IF NOT EXISTS job_matches (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SELECT 'Tablas creadas correctamente.' AS resultado;
+
+-- ──────────────────────────────────────────
+-- Tabla: applications (postulaciones)
+-- ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS applications (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    job_id       INT NOT NULL,
+    employee_id  INT NOT NULL,
+    message      TEXT,                         -- mensaje opcional del candidato
+    status       VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending | seen | rejected
+    applied_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (job_id)      REFERENCES jobs(id)  ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_application (job_id, employee_id),  -- un empleado solo postula 1 vez por empleo
+    INDEX idx_job    (job_id),
+    INDEX idx_employee (employee_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

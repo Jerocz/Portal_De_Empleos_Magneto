@@ -63,7 +63,7 @@
               <option value="">— Selecciona —</option>
               <option value="remote">🌐 Remoto</option>
               <option value="hybrid">🔀 Híbrido</option>
-              <option value="on-site">🏢 Presencial</option>
+              <option value="presencial">🏢 Presencial</option>
             </select>
           </div>
           <div class="field">
@@ -92,9 +92,14 @@
           </div>
         </div>
 
-        <button type="submit" class="btn btn-primary" style="margin-top:8px">
-          <i class="fas fa-floppy-disk"></i> Guardar perfil
-        </button>
+        <div style="display:flex;gap:12px;align-items:center;margin-top:8px;flex-wrap:wrap">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-floppy-disk"></i> Guardar perfil
+          </button>
+          <button type="button" onclick="eliminarCuenta()" style="background:none;border:1.5px solid #fca5a5;color:#dc2626;border-radius:10px;padding:10px 18px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;transition:all .2s" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'">
+            <i class="fas fa-user-xmark"></i> Eliminar mi cuenta
+          </button>
+        </div>
 
       </form>
     </div>
@@ -175,6 +180,23 @@
         msgEl.innerHTML = `<div class="msg msg-error"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
       }
       setTimeout(() => msgEl.innerHTML = "", 3000);
+    }
+
+    async function eliminarCuenta() {
+      if (!confirm("¿Seguro que quieres eliminar tu cuenta? Se borrarán tu perfil y todos tus datos. Esta acción no se puede deshacer.")) return;
+      try {
+        await apiFetch("/profile/", { method: "DELETE" });
+      } catch (err) {
+        // Si el error es 401 (usuario ya eliminado) igual procedemos
+        if (!err.message.includes("401")) {
+          alert("Error al eliminar la cuenta: " + err.message);
+          return;
+        }
+      }
+      // Limpiar sesión y redirigir sin importar el resultado
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "index.html";
     }
 
     cargarPerfil();

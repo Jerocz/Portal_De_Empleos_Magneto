@@ -79,3 +79,18 @@ def get_job(
     if not job:
         raise HTTPException(status_code=404, detail="Empleo no encontrado")
     return DTOFactory.job_dto_to_dict(DTOFactory.create_job_dto(job))
+
+
+@router.delete("/{job_id}")
+def delete_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    if current_user.get("role") != "employer":
+        raise HTTPException(status_code=403, detail="Solo contratantes pueden eliminar empleos")
+    job_repo = JobRepository(db)
+    deleted = job_repo.delete(job_id, current_user["id"])
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Empleo no encontrado o no te pertenece")
+    return {"message": "Vacante eliminada correctamente"}

@@ -1,8 +1,24 @@
 """
 Patrón de Diseño: Strategy (Comportamiento)
 Sistema de puntos: cada campo que coincide suma 25 pts (máx 100).
+Las explicaciones usan prefijo 'OK:' o 'NO:' para que el frontend
+pueda determinar si cada criterio coincidió sin ambigüedad.
+
+Comparaciones normalizadas: sin tildes, minúsculas, sin espacios extra,
+para que "Medellín", "medellin", "MEDELLÍN" sean equivalentes.
 """
 from abc import ABC, abstractmethod
+import unicodedata
+
+
+def _normalize(text: str) -> str:
+    """Convierte a minúsculas, elimina tildes/diacríticos y espacios extra."""
+    if not text:
+        return ""
+    # Descompone caracteres con tilde (á → a + combining accent) y descarta el acento
+    nfkd = unicodedata.normalize("NFKD", text)
+    sin_tildes = "".join(c for c in nfkd if not unicodedata.combining(c))
+    return sin_tildes.lower().strip()
 
 
 class MatchingStrategy(ABC):
@@ -13,7 +29,8 @@ class MatchingStrategy(ABC):
 
     @abstractmethod
     def calculate(self, user_profile: dict, job: dict) -> tuple[float, str]:
-        """Retorna (puntos aportados 0 o 25, descripción del resultado)."""
+        """Retorna (puntos aportados 0 o 25, descripción del resultado).
+        El string comienza con 'OK:' si coincide, o 'NO:' si no coincide."""
         pass
 
 
@@ -25,20 +42,23 @@ class CityMatchStrategy(MatchingStrategy):
         return "city"
 
     def calculate(self, user_profile: dict, job: dict) -> tuple[float, str]:
-        job_modality = (job.get("modality") or "").lower().strip()
+        job_modality = _normalize(job.get("modality") or "")
         if job_modality == "remote":
-            return 25.0, "Ciudad: trabajo remoto (ubicación flexible)"
+            return 25.0, "OK:Ciudad: trabajo remoto (ubicación flexible)"
 
-        user_city = (user_profile.get("location_city") or "").lower().strip()
-        job_city = (job.get("city") or "").lower().strip()
+        user_city = _normalize(user_profile.get("location_city") or "")
+        job_city  = _normalize(job.get("city") or "")
 
         if not user_city or not job_city:
-            return 0.0, "Ciudad: sin datos de ubicación"
+            return 0.0, "NO:Ciudad: sin datos de ubicación"
 
         if user_city == job_city or user_city in job_city or job_city in user_city:
-            return 25.0, f"Ciudad: {job_city.title()}"
+            # Mostrar el nombre original (sin normalizar) para mejor legibilidad
+            display = (job.get("city") or "").strip().title()
+            return 25.0, f"OK:Ciudad: {display}"
 
-        return 0.0, f"Ciudad: {job_city.title()} (diferente a la tuya)"
+        display = (job.get("city") or "").strip().title()
+        return 0.0, f"NO:Ciudad: {display} (diferente a la tuya)"
 
 
 class ModalityMatchStrategy(MatchingStrategy):
@@ -49,19 +69,19 @@ class ModalityMatchStrategy(MatchingStrategy):
         return "modality"
 
     def calculate(self, user_profile: dict, job: dict) -> tuple[float, str]:
-        user_mod = (user_profile.get("modality") or "").lower().strip()
-        job_mod = (job.get("modality") or "").lower().strip()
+        user_mod = _normalize(user_profile.get("modality") or "")
+        job_mod  = _normalize(job.get("modality") or "")
 
         if not user_mod or not job_mod:
-            return 0.0, "Modalidad: sin preferencia definida"
+            return 0.0, "NO:Modalidad: sin preferencia definida"
 
         if user_mod == job_mod:
-            return 25.0, f"Modalidad: {job_mod}"
+            return 25.0, f"OK:Modalidad: {job_mod}"
 
         if "hybrid" in (user_mod, job_mod):
-            return 25.0, f"Modalidad: {job_mod} (compatible con híbrido)"
+            return 25.0, f"OK:Modalidad: {job_mod} (compatible con híbrido)"
 
-        return 0.0, f"Modalidad: {job_mod} (no coincide con tu preferencia)"
+        return 0.0, f"NO:Modalidad: {job_mod} (no coincide con tu preferencia)"
 
 
 class SalaryMatchStrategy(MatchingStrategy):
@@ -78,21 +98,21 @@ class SalaryMatchStrategy(MatchingStrategy):
         j_max = job.get("salary_max_cop") or 0
 
         if not j_min and not j_max:
-            return 0.0, "Salario: el empleo no especifica salario"
+            return 0.0, "NO:Salario: el empleo no especifica salario"
         if not u_min and not u_max:
-            return 0.0, "Salario: no definiste expectativa salarial"
+            return 0.0, "NO:Salario: no definiste expectativa salarial"
 
         eff_j_max = j_max or j_min * 2
         eff_u_max = u_max or u_min * 2
 
         overlap = min(eff_u_max, eff_j_max) - max(u_min, j_min)
-        j_min_k = j_min // 1000
-        j_max_k = eff_j_max // 1000
+        j_min_k  = j_min // 1000
+        j_max_k  = eff_j_max // 1000
 
         if overlap >= 0:
-            return 25.0, f"Salario: {j_min_k}K–{j_max_k}K COP (dentro de tu rango)"
+            return 25.0, f"OK:Salario: {j_min_k}K–{j_max_k}K COP (dentro de tu rango)"
 
-        return 0.0, f"Salario: {j_min_k}K–{j_max_k}K COP (fuera de tu rango)"
+        return 0.0, f"NO:Salario: {j_min_k}K–{j_max_k}K COP (fuera de tu rango)"
 
 
 class SkillsMatchStrategy(MatchingStrategy):
@@ -103,21 +123,25 @@ class SkillsMatchStrategy(MatchingStrategy):
         return "skills"
 
     def calculate(self, user_profile: dict, job: dict) -> tuple[float, str]:
-        user_skills = {s.lower().strip() for s in (user_profile.get("skills") or [])}
-        job_skills = {s.lower().strip() for s in (job.get("skills_required") or [])}
+        # Normalizar cada skill individualmente
+        user_skills = {_normalize(s) for s in (user_profile.get("skills") or []) if s}
+        job_skills  = {_normalize(s) for s in (job.get("skills_required") or []) if s}
 
         if not job_skills:
-            return 0.0, "Skills: el empleo no lista skills requeridas"
+            return 0.0, "NO:Skills: el empleo no lista skills requeridas"
         if not user_skills:
-            return 0.0, "Skills: no tienes skills en tu perfil"
+            return 0.0, "NO:Skills: no tienes skills en tu perfil"
 
         coincidencias = sorted(user_skills & job_skills)
-        faltantes = sorted(job_skills - user_skills)
+        faltantes     = sorted(job_skills - user_skills)
 
         if coincidencias:
-            return 25.0, f"Skills: {', '.join(coincidencias)} ✓ (faltan: {', '.join(faltantes) or 'ninguna'})"
+            return 25.0, (
+                f"OK:Skills: {', '.join(coincidencias)} "
+                f"(faltan: {', '.join(faltantes) or 'ninguna'})"
+            )
 
-        return 0.0, f"Skills: sin coincidencias (requiere: {', '.join(sorted(job_skills))})"
+        return 0.0, f"NO:Skills: sin coincidencias (requiere: {', '.join(sorted(job_skills))})"
 
 
 class CompositeMatchingStrategy:

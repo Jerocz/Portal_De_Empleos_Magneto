@@ -43,6 +43,16 @@
       <button class="btn btn-secondary" onclick="toggleNotif()">
         <i class="fas fa-bell"></i> Notificaciones
       </button>
+      <button class="btn btn-secondary" onclick="toggleMisPostulaciones()">
+        <i class="fas fa-paper-plane"></i> Mis postulaciones
+        <span id="badgePostulaciones" style="display:none;background:#dc2626;color:white;border-radius:999px;font-size:11px;padding:1px 7px;margin-left:4px"></span>
+      </button>
+    </div>
+
+    <!-- Panel mis postulaciones -->
+    <div id="misPostulacionesPanel" class="notif-panel hidden">
+      <h3><i class="fas fa-paper-plane" style="color:var(--teal-mid)"></i> Mis postulaciones</h3>
+      <div id="misPostulacionesLista"><p class="text-muted">Cargando...</p></div>
     </div>
 
     <!-- Notifications panel -->
@@ -58,6 +68,33 @@
 
   </div>
 
+  <!-- ▸ MODAL POSTULACIÓN -->
+  <div id="modalPostulacion" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:white;border-radius:18px;padding:32px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);position:relative">
+      <button onclick="cerrarModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--t3)">✕</button>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <div style="width:44px;height:44px;border-radius:12px;background:var(--teal-pale);display:flex;align-items:center;justify-content:center;color:var(--teal-mid);font-size:20px">
+          <i class="fas fa-paper-plane"></i>
+        </div>
+        <div>
+          <h3 style="margin:0;font-size:16px;color:var(--navy)" id="modalJobTitle">Postularse</h3>
+          <span style="font-size:13px;color:var(--t3)" id="modalJobCompany"></span>
+        </div>
+      </div>
+      <div id="modalMsg"></div>
+      <label style="font-size:13px;font-weight:600;color:var(--navy);display:block;margin-bottom:8px">
+        <i class="fas fa-comment"></i> &nbsp;Mensaje para el empleador <span style="font-weight:400;color:var(--t3)">(opcional)</span>
+      </label>
+      <textarea id="modalMessage" rows="4" placeholder="Cuéntale al empleador por qué eres el candidato ideal..." style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit"></textarea>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button onclick="cerrarModal()" style="flex:0 0 auto;padding:11px 18px;border:1.5px solid var(--border);border-radius:10px;background:white;cursor:pointer;font-size:13px;color:var(--t3)">Cancelar</button>
+        <button onclick="enviarPostulacion()" id="btnEnviarPostulacion" style="flex:1;background:var(--teal-mid);color:white;border:none;border-radius:10px;padding:11px;cursor:pointer;font-size:13px;font-weight:600">
+          <i class="fas fa-paper-plane"></i> Enviar postulación
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="config.js"></script>
   <script>
     requireAuth();
@@ -66,6 +103,112 @@
     if (user) {
       const nombre = user.full_name.split(" ")[0];
       document.getElementById("saludo").textContent = `Hola, ${nombre} 👋`;
+    }
+
+    // ── Estado del modal ──
+    let _modalJobId = null;
+
+    function abrirModalPostulacion(jobId, title, company, btn) {
+      _modalJobId = jobId;
+      document.getElementById("modalJobTitle").textContent = title;
+      document.getElementById("modalJobCompany").textContent = company;
+      document.getElementById("modalMessage").value = "";
+      document.getElementById("modalMsg").innerHTML = "";
+      document.getElementById("modalPostulacion").style.display = "flex";
+    }
+
+    function cerrarModal() {
+      document.getElementById("modalPostulacion").style.display = "none";
+    }
+
+    async function enviarPostulacion() {
+      const btn = document.getElementById("btnEnviarPostulacion");
+      const msgEl = document.getElementById("modalMsg");
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+      try {
+        await apiFetch("/applications/", {
+          method: "POST",
+          body: JSON.stringify({
+            job_id: _modalJobId,
+            message: document.getElementById("modalMessage").value || null,
+          }),
+        });
+        msgEl.innerHTML = `<div class="msg msg-success" style="margin-bottom:12px"><i class="fas fa-circle-check"></i> ¡Postulación enviada!</div>`;
+        // Marcar botón de la card como postulado
+        const applyBtn = document.getElementById(`btn-apply-${_modalJobId}`);
+        if (applyBtn) {
+          applyBtn.innerHTML = '<i class="fas fa-circle-check"></i> Postulado';
+          applyBtn.disabled = true;
+          applyBtn.style.background = "#059669";
+          applyBtn.onclick = null;
+        }
+        setTimeout(cerrarModal, 1500);
+        cargarMisPostulaciones();
+      } catch (err) {
+        msgEl.innerHTML = `<div class="msg msg-error" style="margin-bottom:12px"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar postulación';
+      }
+    }
+
+    // ── Mis postulaciones panel ──
+    function toggleMisPostulaciones() {
+      const panel = document.getElementById("misPostulacionesPanel");
+      panel.classList.toggle("hidden");
+      if (!panel.classList.contains("hidden")) cargarMisPostulaciones();
+    }
+
+    async function cargarMisPostulaciones() {
+      const lista = document.getElementById("misPostulacionesLista");
+      try {
+        const apps = await apiFetch("/applications/my-applications");
+        const badge = document.getElementById("badgePostulaciones");
+        if (apps.length > 0) {
+          badge.style.display = "inline";
+          badge.textContent = apps.length;
+        } else {
+          badge.style.display = "none";
+        }
+        if (apps.length === 0) {
+          lista.innerHTML = `<p class="text-muted">Aún no te has postulado a ninguna vacante.</p>`;
+          return;
+        }
+        const statusLabel = { pending: "⏳ Pendiente", seen: "👀 Visto", rejected: "✗ No seleccionado" };
+        const statusColor = { pending: "#d97706", seen: "#3b82f6", rejected: "#dc2626" };
+        lista.innerHTML = apps.map(a => `
+          <div style="border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+              <div>
+                <strong style="color:var(--navy)">${a.title}</strong>
+                <span style="display:block;font-size:12px;color:var(--t3)"><i class="fas fa-building"></i> ${a.company}</span>
+              </div>
+              <span style="font-size:12px;font-weight:600;color:${statusColor[a.status] || '#6b7280'}">${statusLabel[a.status] || a.status}</span>
+            </div>
+            ${a.message ? `<p style="font-size:12px;color:var(--t3);margin:8px 0 0;font-style:italic">"${a.message}"</p>` : ""}
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+              <span style="font-size:11px;color:var(--t4)">${new Date(a.applied_at).toLocaleDateString("es-CO")}</span>
+              <button onclick="retirarPostulacion(${a.id}, this)" style="background:none;border:1px solid #fca5a5;color:#dc2626;border-radius:7px;padding:4px 10px;cursor:pointer;font-size:11px">
+                <i class="fas fa-xmark"></i> Retirar
+              </button>
+            </div>
+          </div>
+        `).join("");
+      } catch (err) {
+        lista.innerHTML = `<p class="text-muted">Error cargando postulaciones.</p>`;
+      }
+    }
+
+    async function retirarPostulacion(appId, btn) {
+      if (!confirm("¿Retirar esta postulación?")) return;
+      btn.disabled = true;
+      try {
+        await apiFetch(`/applications/${appId}`, { method: "DELETE" });
+        cargarMisPostulaciones();
+      } catch (err) {
+        alert(err.message);
+        btn.disabled = false;
+      }
     }
 
     const RANK_CONFIG = [
@@ -91,7 +234,7 @@
       const map = {
         remote:    `<span class="badge badge-remote"><i class="fas fa-wifi"></i> Remoto</span>`,
         hybrid:    `<span class="badge badge-hybrid"><i class="fas fa-arrows-left-right"></i> Híbrido</span>`,
-        "on-site": `<span class="badge badge-onsite"><i class="fas fa-building"></i> Presencial</span>`,
+        "presencial": `<span class="badge badge-onsite"><i class="fas fa-building"></i> Presencial</span>`,
       };
       return map[m] || `<span class="badge">${m}</span>`;
     }
@@ -112,13 +255,13 @@
     function renderCriteria(exp) {
       if (!exp) return "";
       return exp.split(" | ").map(part => {
-        const ok = part.includes("✓") || part.includes("flexible") ||
-                   part.includes("compatible") || part.includes("dentro de") ||
-                   part.includes("remoto");
+        // El backend prefija con "OK:" si coincide, "NO:" si no
+        const ok = part.startsWith("OK:");
+        const label = part.replace(/^(OK|NO):/, "");
         const ic = ok
           ? `<i class="fas fa-circle-check ci yes"></i>`
           : `<i class="fas fa-circle-xmark ci no"></i>`;
-        return `<li>${ic}<span>${part.replace(" ✓", "")}</span></li>`;
+        return `<li>${ic}<span>${label}</span></li>`;
       }).join("");
     }
 
@@ -179,7 +322,7 @@
         : `<div class="score-badge ${nivel}">${m.score}<small>pts</small></div>`;
 
       return `
-        <div class="match-card ${rankCls}">
+        <div class="match-card ${rankCls}" id="mc-${m.job_id}">
           <div class="rank-stripe"></div>
           <div class="match-body">
             ${rankLabel}
@@ -203,6 +346,15 @@
                 ${m.skills_required.map(s => `<span class="skill-tag">${s}</span>`).join("")}
               </div>` : ""}
             ${salary ? `<p class="match-salary"><i class="fas fa-peso-sign"></i> ${salary}</p>` : ""}
+            <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+              <button
+                id="btn-apply-${m.job_id}"
+                onclick="abrirModalPostulacion(${m.job_id}, '${m.title.replace(/'/g,"\\'")}', '${m.company.replace(/'/g,"\\'")}', this)"
+                style="background:var(--teal-mid);color:white;border:none;border-radius:10px;padding:9px 18px;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;transition:all .2s"
+                onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+                <i class="fas fa-paper-plane"></i> Postularme
+              </button>
+            </div>
           </div>
         </div>`;
     }
@@ -249,6 +401,7 @@
 
     cargarMatches();
     cargarNotificaciones();
+    cargarMisPostulaciones();
   </script>
 </body>
 </html>

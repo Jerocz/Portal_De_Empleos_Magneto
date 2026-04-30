@@ -40,7 +40,7 @@
         <option value="">Todas las modalidades</option>
         <option value="remote">Remoto</option>
         <option value="hybrid">Híbrido</option>
-        <option value="on-site">Presencial</option>
+        <option value="presencial">Presencial</option>
       </select>
       <button class="btn btn-ghost" onclick="limpiarFiltros()">
         <i class="fas fa-xmark"></i> Limpiar
@@ -64,7 +64,7 @@
       const map = {
         remote:    `<span class="badge badge-remote"><i class="fas fa-wifi"></i> Remoto</span>`,
         hybrid:    `<span class="badge badge-hybrid"><i class="fas fa-arrows-left-right"></i> Híbrido</span>`,
-        "on-site": `<span class="badge badge-onsite"><i class="fas fa-building"></i> Presencial</span>`,
+        "presencial": `<span class="badge badge-onsite"><i class="fas fa-building"></i> Presencial</span>`,
       };
       return map[m] || `<span class="badge">${m}</span>`;
     }

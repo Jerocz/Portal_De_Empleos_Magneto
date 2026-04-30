@@ -42,3 +42,12 @@ class UserRepository:
         )
         self._db.commit()
         return self.find_by_email(email)
+
+    def delete(self, user_id: int) -> bool:
+        """Elimina el usuario y en cascada su perfil y matches."""
+        result = self._db.execute(
+            text("DELETE FROM users WHERE id = :id"),
+            {"id": user_id},
+        )
+        self._db.commit()
+        return result.rowcount > 0
