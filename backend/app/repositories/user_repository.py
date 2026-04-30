@@ -32,13 +32,13 @@ class UserRepository:
         ).fetchone()
         return row is not None
 
-    def create(self, email: str, full_name: str, password_hash: str) -> dict:
+    def create(self, email: str, full_name: str, password_hash: str, role: str = "employee") -> dict:
         self._db.execute(
             text(
-                "INSERT INTO users (email, full_name, password_hash, is_active) "
-                "VALUES (:e, :n, :p, 1)"
+                "INSERT INTO users (email, full_name, password_hash, role, is_active) "
+                "VALUES (:e, :n, :p, :r, 1)"
             ),
-            {"e": email, "n": full_name, "p": password_hash},
+            {"e": email, "n": full_name, "p": password_hash, "r": role},
         )
         self._db.commit()
         return self.find_by_email(email)

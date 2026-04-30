@@ -14,11 +14,24 @@ class RegisterData(BaseModel):
     email: str
     full_name: str
     password: str
+    role: str = "employee"  # employee | employer
 
 
 class LoginData(BaseModel):
     email: str
     password: str
+
+
+def _user_response(user: dict, token: str) -> dict:
+    return {
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "full_name": user["full_name"],
+            "role": user.get("role", "employee"),
+        },
+    }
 
 
 @router.post("/register")
@@ -30,9 +43,8 @@ def register(data: RegisterData, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="El email ya esta registrado")
 
     hashed = hash_password(data.password)
-    user = user_repo.create(data.email, data.full_name, hashed)
-    token = create_token(user["id"])
-    return {"token": token, "user": {"id": user["id"], "email": user["email"], "full_name": user["full_name"]}}
+    user = user_repo.create(data.email, data.full_name, hashed, data.role)
+    return _user_response(user, create_token(user["id"]))
 
 
 @router.post("/login")
@@ -43,5 +55,4 @@ def login(data: LoginData, db: Session = Depends(get_db)):
     if not user or not verify_password(data.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
 
-    token = create_token(user["id"])
-    return {"token": token, "user": {"id": user["id"], "email": user["email"], "full_name": user["full_name"]}}
+    return _user_response(user, create_token(user["id"]))
