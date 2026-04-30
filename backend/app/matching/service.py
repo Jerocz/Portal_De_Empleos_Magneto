@@ -1,6 +1,3 @@
-"""
-Servicio de Matching: orquesta la ejecución del algoritmo de matching.
-"""
 from datetime import date
 from sqlalchemy.orm import Session
 
@@ -9,39 +6,34 @@ from app.repositories.job_repository import JobRepository
 from app.repositories.match_repository import MatchRepository
 
 
-# SOLID: Single Responsibility - solo coordina el proceso de matching
-# GRASP: Controlador - orquesta la operación entre repositories y estrategias
 class MatchingService:
-    """Coordina la ejecución de matching entre un usuario y todos los empleos disponibles."""
+    """Calcula y guarda el ranking de empleos para un usuario."""
 
-    def __init__(
-        self,
-        db: Session,
-        strategy: CompositeMatchingStrategy | None = None,
-    ) -> None:
-        # SOLID: Dependency Inversion - depende de abstracciones, no de implementaciones concretas
+    def __init__(self, db: Session, strategy: CompositeMatchingStrategy | None = None) -> None:
         self._job_repo = JobRepository(db)
         self._match_repo = MatchRepository(db)
         self._strategy = strategy or CompositeMatchingStrategy()
         self._db = db
 
-    def run_matching(self, user_id: int, user_profile: dict) -> int:
+    def run_matching(self, user_id: int, user_profile: dict) -> dict:
         """
-        Ejecuta el matching completo para un usuario.
-        Retorna la cantidad de nuevos matches guardados hoy.
+        Recalcula el matching completo para el usuario.
+        Guarda TODOS los empleos con su puntaje (0-100) para generar el ranking.
+        Retorna un dict con totales para el mensaje de respuesta.
         """
         jobs = self._job_repo.find_all(limit=200)
+
+        # Borra matches anteriores para obtener resultados frescos
+        self._match_repo.delete_by_user(user_id)
+
         today = date.today()
-        nuevos_matches = 0
+        con_afinidad = 0
 
         for job in jobs:
             score, explanation = self._strategy.calculate(user_profile, job)
-
-            if score > 0:
-                existing = self._match_repo.find_by_user_job_date(user_id, job["id"], today)
-                if not existing:
-                    self._match_repo.create(user_id, job["id"], score, explanation, today)
-                    nuevos_matches += 1
+            self._match_repo.create(user_id, job["id"], score, explanation, today)
+            if score >= 25:
+                con_afinidad += 1
 
         self._db.commit()
-        return nuevos_matches
+        return {"total": len(jobs), "con_afinidad": con_afinidad}

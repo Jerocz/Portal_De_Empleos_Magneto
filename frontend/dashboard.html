@@ -2,42 +2,58 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Magneto - Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Magneto — Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <nav>
-    <div class="brand">Magneto Empleos</div>
-    <div class="links">
-      <a href="dashboard.html">Inicio</a>
-      <a href="jobs.html">Empleos</a>
-      <a href="profile.html">Mi Perfil</a>
-      <button onclick="logout()">Salir</button>
+  <!-- ▸ APP NAVBAR -->
+  <nav class="app-nav">
+    <a href="dashboard.html" class="app-brand">
+      <div class="app-logo"><i class="fas fa-briefcase"></i></div>
+      <span class="app-brand-name">Mag<span>neto</span></span>
+    </a>
+    <div class="app-links">
+      <a href="dashboard.html" class="active"><i class="fas fa-house"></i> <span>Inicio</span></a>
+      <a href="jobs.html"><i class="fas fa-magnifying-glass"></i> <span>Empleos</span></a>
+      <a href="profile.html"><i class="fas fa-user"></i> <span>Mi Perfil</span></a>
+      <button class="btn-logout" onclick="logout()"><i class="fas fa-right-from-bracket"></i> Salir</button>
     </div>
   </nav>
 
-  <div class="container">
+  <div class="app-container">
 
-    <h2 id="saludo">Hola!</h2>
-    <p class="text-muted" style="margin-bottom: 16px;">Estos son tus mejores matches</p>
-
-    <div style="margin-bottom: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
-      <button class="btn btn-primary" onclick="buscarMatches()">Buscar matches</button>
-      <button class="btn btn-secondary" onclick="toggleNotif()">Notificaciones</button>
+    <!-- Welcome banner -->
+    <div class="welcome-banner">
+      <div class="welcome-text">
+        <h2 id="saludo">Bienvenido</h2>
+        <p id="welcome-sub">Analiza los empleos disponibles para ver tu ranking de compatibilidad</p>
+      </div>
+      <button class="btn-search-hero" onclick="buscarMatches()">
+        <i class="fas fa-bolt"></i> Buscar matches
+      </button>
     </div>
 
     <div id="matchStatus"></div>
 
-    <!-- Panel de notificaciones -->
-    <div id="notifPanel" class="card hidden">
-      <h3 style="margin-bottom: 12px; font-size: 15px;">Notificaciones</h3>
+    <!-- Action bar -->
+    <div class="action-bar">
+      <button class="btn btn-secondary" onclick="toggleNotif()">
+        <i class="fas fa-bell"></i> Notificaciones
+      </button>
+    </div>
+
+    <!-- Notifications panel -->
+    <div id="notifPanel" class="notif-panel hidden">
+      <h3><i class="fas fa-bell" style="color:#d97706"></i> Notificaciones destacadas</h3>
       <div id="notifLista"><p class="text-muted">Sin notificaciones.</p></div>
     </div>
 
     <!-- Matches -->
     <div id="matchesContainer">
-      <p class="text-muted">Cargando...</p>
+      <p class="text-muted"><i class="fas fa-spinner fa-spin"></i> &nbsp;Cargando...</p>
     </div>
 
   </div>
@@ -46,38 +62,148 @@
   <script>
     requireAuth();
     const user = getUser();
-    if (user) document.getElementById("saludo").textContent = "Hola, " + user.full_name.split(" ")[0] + "!";
+    if (user) {
+      const nombre = user.full_name.split(" ")[0];
+      document.getElementById("saludo").textContent = `Hola, ${nombre} 👋`;
+    }
 
-    function claseScore(s) {
-      if (s >= 80) return "score-alto";
-      if (s >= 50) return "score-medio";
-      return "score-bajo";
+    const RANK_CONFIG = [
+      { cls: "rank-1", labelCls: "gold",   icon: "👑", text: "Mejor Match" },
+      { cls: "rank-2", labelCls: "silver",  icon: "🥈", text: "2do lugar"  },
+      { cls: "rank-3", labelCls: "bronze",  icon: "🥉", text: "3er lugar"  },
+    ];
+
+    function scoreColor(s) {
+      if (s >= 75) return "#059669";
+      if (s >= 50) return "#d97706";
+      if (s >= 25) return "#3b82f6";
+      return "#9ca3af";
+    }
+
+    function scoreNivel(s) {
+      if (s >= 75) return "alto";
+      if (s >= 25) return "medio";
+      return "bajo";
+    }
+
+    function badgeMod(m) {
+      const map = {
+        remote:    `<span class="badge badge-remote"><i class="fas fa-wifi"></i> Remoto</span>`,
+        hybrid:    `<span class="badge badge-hybrid"><i class="fas fa-arrows-left-right"></i> Híbrido</span>`,
+        "on-site": `<span class="badge badge-onsite"><i class="fas fa-building"></i> Presencial</span>`,
+      };
+      return map[m] || `<span class="badge">${m}</span>`;
+    }
+
+    function formatSalary(min, max) {
+      if (!min && !max) return null;
+      const fmt = n => n.toLocaleString("es-CO");
+      if (min && max) return `$${fmt(min)} – $${fmt(max)} COP`;
+      if (min) return `Desde $${fmt(min)} COP`;
+      return `Hasta $${fmt(max)} COP`;
+    }
+
+    function ptsTxt(score) {
+      const p = Math.round(score / 25);
+      return `${p} de 4 campos`;
+    }
+
+    function renderCriteria(exp) {
+      if (!exp) return "";
+      return exp.split(" | ").map(part => {
+        const ok = part.includes("✓") || part.includes("flexible") ||
+                   part.includes("compatible") || part.includes("dentro de") ||
+                   part.includes("remoto");
+        const ic = ok
+          ? `<i class="fas fa-circle-check ci yes"></i>`
+          : `<i class="fas fa-circle-xmark ci no"></i>`;
+        return `<li>${ic}<span>${part.replace(" ✓", "")}</span></li>`;
+      }).join("");
     }
 
     async function cargarMatches() {
       const cont = document.getElementById("matchesContainer");
       try {
         const matches = await apiFetch("/matches/");
-        if (matches.length === 0) {
-          cont.innerHTML = `<div class="card text-center"><p>No tienes matches todavía.</p><p class="text-muted">Completa tu <a href="profile.html">perfil</a> y haz clic en "Buscar matches".</p></div>`;
+
+        const conMatch = matches.filter(m => m.score >= 25);
+        const sinMatch = matches.filter(m => m.score < 25);
+        const todos = [...conMatch, ...sinMatch];
+
+        if (todos.length === 0) {
+          cont.innerHTML = `
+            <div class="empty-state">
+              <span class="empty-icon">🔍</span>
+              <h3>Aún no tienes matches</h3>
+              <p>Haz clic en <strong>"Buscar matches"</strong> para analizar todos los empleos disponibles y ver cuáles son más compatibles con tu perfil.</p>
+              <button class="btn btn-primary" onclick="buscarMatches()">
+                <i class="fas fa-bolt"></i> Buscar ahora
+              </button>
+            </div>`;
           return;
         }
-        cont.innerHTML = matches.map(m => `
-          <div class="match-card">
-            <div class="score ${claseScore(m.score)}">${m.score}%</div>
-            <h3>${m.title}</h3>
-            <span class="company">${m.company}</span>
-            <p class="meta">📍 ${m.city} · ${m.modality}</p>
-            <p class="explanation">${m.explanation}</p>
-            <p class="salary">💰 $${m.salary_min_cop?.toLocaleString()} – $${m.salary_max_cop?.toLocaleString()} COP</p>
-            <div class="skills-row">
-              ${(m.skills_required || []).map(s => `<span class="skill-tag">${s}</span>`).join("")}
-            </div>
-          </div>
-        `).join("");
+
+        const sub = conMatch.length > 0
+          ? `${conMatch.length} empleo${conMatch.length > 1 ? "s" : ""} con afinidad de ${todos.length} analizados`
+          : `${todos.length} empleos analizados — actualiza tu perfil para mejorar coincidencias`;
+        document.getElementById("welcome-sub").textContent = sub;
+
+        cont.innerHTML = `
+          ${conMatch.length > 0 ? `<div class="section-label"><i class="fas fa-star" style="color:#d97706"></i> Empleos con afinidad</div>` : ""}
+          ${todos.map((m, i) => renderMatchCard(m, i)).join("")}
+        `;
+
       } catch (err) {
-        cont.innerHTML = `<div class="msg msg-error">Error: ${err.message}</div>`;
+        cont.innerHTML = `<div class="msg msg-error"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
       }
+    }
+
+    function renderMatchCard(m, idx) {
+      const rank   = RANK_CONFIG[idx];
+      const nivel  = scoreNivel(m.score);
+      const clr    = scoreColor(m.score);
+      const salary = formatSalary(m.salary_min_cop, m.salary_max_cop);
+      const rankCls = rank ? rank.cls : "rank-other";
+
+      const rankLabel = rank
+        ? `<div class="rank-label ${rank.labelCls}">${rank.icon} ${rank.text}</div>`
+        : "";
+
+      const isTop = idx < 3;
+      const ringSize = idx === 0 ? "lg" : "";
+      const scoreRing = isTop
+        ? `<div class="score-ring ${ringSize}" style="--pct:${m.score};--clr:${clr}">
+             <div class="ring-inner">${m.score}<small>pts</small></div>
+           </div>`
+        : `<div class="score-badge ${nivel}">${m.score}<small>pts</small></div>`;
+
+      return `
+        <div class="match-card ${rankCls}">
+          <div class="rank-stripe"></div>
+          <div class="match-body">
+            ${rankLabel}
+            <div class="match-header">
+              ${scoreRing}
+              <div class="match-info">
+                <h3>${m.title}</h3>
+                <span class="match-company">
+                  <i class="fas fa-building"></i> ${m.company}
+                </span>
+              </div>
+            </div>
+            <div class="match-meta">
+              <span class="match-city"><i class="fas fa-location-dot"></i> ${m.city}</span>
+              ${badgeMod(m.modality)}
+              <span style="font-size:12px;color:var(--t4);margin-left:4px">${ptsTxt(m.score)}</span>
+            </div>
+            <ul class="criteria-list">${renderCriteria(m.explanation)}</ul>
+            ${(m.skills_required || []).length > 0 ? `
+              <div class="skills-row">
+                ${m.skills_required.map(s => `<span class="skill-tag">${s}</span>`).join("")}
+              </div>` : ""}
+            ${salary ? `<p class="match-salary"><i class="fas fa-peso-sign"></i> ${salary}</p>` : ""}
+          </div>
+        </div>`;
     }
 
     async function cargarNotificaciones() {
@@ -87,9 +213,13 @@
         if (data.total > 0) {
           lista.innerHTML = data.notificaciones.map(n => `
             <div class="notif-item">
-              <strong>${n.titulo} — <span class="${claseScore(n.score)}">${n.score}%</span></strong>
+              <strong>
+                <i class="fas fa-circle-check" style="color:#059669"></i>
+                ${n.titulo}
+                <span class="score-badge ${scoreNivel(n.score)}" style="font-size:11px;height:22px;padding:0 8px;min-width:0">${n.score}%</span>
+              </strong>
               <span>${n.mensaje}</span>
-              <small>📍 ${n.ciudad} · ${n.modalidad} · ${n.fecha}</small>
+              <small><i class="fas fa-location-dot"></i> ${n.ciudad} · ${n.modalidad} · ${n.fecha}</small>
             </div>
           `).join("");
         } else {
@@ -100,16 +230,16 @@
 
     async function buscarMatches() {
       const statusEl = document.getElementById("matchStatus");
-      statusEl.innerHTML = `<div class="msg msg-info">Buscando matches...</div>`;
+      statusEl.innerHTML = `<div class="msg msg-info"><i class="fas fa-spinner fa-spin"></i> Analizando empleos...</div>`;
       try {
         const data = await apiFetch("/matches/run", { method: "POST" });
-        statusEl.innerHTML = `<div class="msg msg-success">${data.message}</div>`;
+        statusEl.innerHTML = `<div class="msg msg-success"><i class="fas fa-circle-check"></i> ${data.message}</div>`;
         await cargarMatches();
         await cargarNotificaciones();
       } catch (err) {
-        statusEl.innerHTML = `<div class="msg msg-error">${err.message}</div>`;
+        statusEl.innerHTML = `<div class="msg msg-error"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
       }
-      setTimeout(() => statusEl.innerHTML = "", 4000);
+      setTimeout(() => statusEl.innerHTML = "", 5000);
     }
 
     function toggleNotif() {

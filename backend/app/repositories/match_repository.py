@@ -75,6 +75,13 @@ class MatchRepository:
             },
         )
 
+    def delete_by_user(self, user_id: int) -> None:
+        """Borra todos los matches de un usuario para permitir re-calcular."""
+        self._db.execute(
+            text("DELETE FROM job_matches WHERE user_id = :uid"),
+            {"uid": user_id},
+        )
+
     def find_notifications(
         self, user_id: int, min_score: float, limit: int = 10
     ) -> list[dict]:

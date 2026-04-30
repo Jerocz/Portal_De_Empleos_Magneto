@@ -2,71 +2,252 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Magneto Empleos - Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Magneto — Portal de Empleos</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <div class="auth-wrapper">
-    <div class="auth-box">
+  <!-- ▸ LANDING NAVBAR -->
+  <nav class="landing-nav" id="landingNav">
+    <a href="#" class="ln-brand">
+      <div class="ln-logo"><i class="fas fa-briefcase"></i></div>
+      <span><strong>Mag</strong>neto</span>
+    </a>
+    <div class="ln-links">
+      <a href="#categorias">Categorías</a>
+      <a href="#empresas">Empresas</a>
+      <a href="#auth-section">Iniciar sesión</a>
+    </div>
+    <div class="ln-actions">
+      <button class="btn-outline-nav" onclick="scrollToAuth('login')">Iniciar sesión</button>
+      <button class="btn-cta-nav" onclick="scrollToAuth('registro')">Crear cuenta</button>
+    </div>
+  </nav>
 
-      <h1>Magneto Empleos</h1>
-      <p>Encuentra el trabajo que hace match contigo</p>
+  <!-- ▸ HERO -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">
+        <i class="fas fa-bolt"></i> Portal de Empleos Colombia
+      </div>
+      <h1>Encuentra el trabajo<br /><em>ideal para ti</em></h1>
+      <p>Conectamos talento con oportunidades reales. Analiza tu compatibilidad con cientos de empleos en segundos.</p>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <strong>500+</strong>
+          <span>Empleos activos</span>
+        </div>
+        <div class="hero-divider"></div>
+        <div class="hero-stat">
+          <strong>200+</strong>
+          <span>Empresas</span>
+        </div>
+        <div class="hero-divider"></div>
+        <div class="hero-stat">
+          <strong>98%</strong>
+          <span>Satisfacción</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-wave">
+      <svg viewBox="0 0 1440 64" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0,32 C240,64 480,0 720,32 C960,64 1200,0 1440,32 L1440,64 L0,64 Z" fill="#F0F8FA"/>
+      </svg>
+    </div>
+  </section>
 
-      <!-- Tabs -->
-      <div class="tabs">
-        <button class="tab-btn active" onclick="mostrarTab('login')">Iniciar sesión</button>
-        <button class="tab-btn" onclick="mostrarTab('registro')">Registrarse</button>
+  <!-- ▸ AUTH SECTION -->
+  <section class="auth-section" id="auth-section">
+    <div class="auth-container">
+
+      <div class="auth-side-text">
+        <h2>Tu próxima carrera<br /><span>empieza aquí</span></h2>
+        <p style="color:var(--t3);font-size:14.5px;margin-bottom:28px;line-height:1.7">
+          Crea tu perfil, indica tus preferencias y deja que Magneto calcule tu compatibilidad con cada oferta de trabajo disponible.
+        </p>
+        <ul class="auth-features">
+          <li><i class="fas fa-circle-check"></i> Matching inteligente con empleos reales</li>
+          <li><i class="fas fa-circle-check"></i> Ranking de compatibilidad por ciudad, modalidad y salario</li>
+          <li><i class="fas fa-circle-check"></i> Notificaciones de oportunidades destacadas</li>
+          <li><i class="fas fa-circle-check"></i> Perfil profesional con habilidades técnicas</li>
+          <li><i class="fas fa-circle-check"></i> Completamente gratuito para candidatos</li>
+        </ul>
       </div>
 
-      <!-- Login -->
-      <div id="tabLogin">
-        <div id="loginMsg"></div>
-        <form onsubmit="hacerLogin(event)">
-          <div class="field">
-            <label>Email</label>
-            <input type="email" id="loginEmail" placeholder="correo@ejemplo.com" required />
-          </div>
-          <div class="field">
-            <label>Contraseña</label>
-            <input type="password" id="loginPassword" placeholder="Contraseña" required />
-          </div>
-          <button type="submit" class="btn btn-primary" style="width:100%">Entrar</button>
-        </form>
-      </div>
+      <div class="auth-card">
+        <div class="auth-logo">
+          <div class="auth-icon"><i class="fas fa-briefcase"></i></div>
+          <h1>Mag<span>neto</span></h1>
+          <p>Portal de Empleos — Colombia</p>
+        </div>
 
-      <!-- Registro -->
-      <div id="tabRegistro" class="hidden">
-        <div id="registroMsg"></div>
-        <form onsubmit="hacerRegistro(event)">
-          <div class="field">
-            <label>Nombre completo</label>
-            <input type="text" id="regNombre" placeholder="Juan Pérez" required />
-          </div>
-          <div class="field">
-            <label>Email</label>
-            <input type="email" id="regEmail" placeholder="correo@ejemplo.com" required />
-          </div>
-          <div class="field">
-            <label>Contraseña</label>
-            <input type="password" id="regPassword" placeholder="Mínimo 6 caracteres" minlength="6" required />
-          </div>
-          <button type="submit" class="btn btn-primary" style="width:100%">Crear cuenta</button>
-        </form>
+        <div class="tabs">
+          <button class="tab-btn active" onclick="mostrarTab('login')">Iniciar sesión</button>
+          <button class="tab-btn" onclick="mostrarTab('registro')">Crear cuenta</button>
+        </div>
+
+        <!-- Login -->
+        <div id="tabLogin">
+          <div id="loginMsg"></div>
+          <form onsubmit="hacerLogin(event)">
+            <div class="field">
+              <label><i class="fas fa-envelope"></i> &nbsp;Correo electrónico</label>
+              <input type="email" id="loginEmail" placeholder="correo@ejemplo.com" required autocomplete="email" />
+            </div>
+            <div class="field">
+              <label><i class="fas fa-lock"></i> &nbsp;Contraseña</label>
+              <input type="password" id="loginPassword" placeholder="Tu contraseña" required autocomplete="current-password" />
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px">
+              <i class="fas fa-right-to-bracket"></i> Entrar
+            </button>
+          </form>
+        </div>
+
+        <!-- Registro -->
+        <div id="tabRegistro" class="hidden">
+          <div id="registroMsg"></div>
+          <form onsubmit="hacerRegistro(event)">
+            <div class="field">
+              <label><i class="fas fa-user"></i> &nbsp;Nombre completo</label>
+              <input type="text" id="regNombre" placeholder="Juan Pérez" required autocomplete="name" />
+            </div>
+            <div class="field">
+              <label><i class="fas fa-envelope"></i> &nbsp;Correo electrónico</label>
+              <input type="email" id="regEmail" placeholder="correo@ejemplo.com" required autocomplete="email" />
+            </div>
+            <div class="field">
+              <label><i class="fas fa-lock"></i> &nbsp;Contraseña</label>
+              <input type="password" id="regPassword" placeholder="Mínimo 6 caracteres" minlength="6" required autocomplete="new-password" />
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px">
+              <i class="fas fa-user-plus"></i> Crear cuenta
+            </button>
+          </form>
+        </div>
       </div>
 
     </div>
-  </div>
+  </section>
+
+  <!-- ▸ CATEGORÍAS -->
+  <section class="section-categories" id="categorias">
+    <div class="section-header">
+      <span class="section-eyebrow">Explora por área</span>
+      <h2>Categorías de empleo</h2>
+      <p>Encuentra ofertas en el área que más te apasiona</p>
+    </div>
+    <div class="categories-grid">
+      <div class="cat-card" onclick="scrollToAuth('registro')">
+        <div class="cat-icon"><i class="fas fa-code"></i></div>
+        <h3>Desarrollo</h3>
+        <span>Software & Backend</span>
+      </div>
+      <div class="cat-card" onclick="scrollToAuth('registro')">
+        <div class="cat-icon"><i class="fas fa-palette"></i></div>
+        <h3>Diseño</h3>
+        <span>UI/UX & Gráfico</span>
+      </div>
+      <div class="cat-card" onclick="scrollToAuth('registro')">
+        <div class="cat-icon"><i class="fas fa-bullhorn"></i></div>
+        <h3>Marketing</h3>
+        <span>Digital & Contenidos</span>
+      </div>
+      <div class="cat-card" onclick="scrollToAuth('registro')">
+        <div class="cat-icon"><i class="fas fa-chart-line"></i></div>
+        <h3>Ventas</h3>
+        <span>Comercial & CRM</span>
+      </div>
+      <div class="cat-card" onclick="scrollToAuth('registro')">
+        <div class="cat-icon"><i class="fas fa-coins"></i></div>
+        <h3>Finanzas</h3>
+        <span>Contabilidad & Auditoría</span>
+      </div>
+      <div class="cat-card" onclick="scrollToAuth('registro')">
+        <div class="cat-icon"><i class="fas fa-users"></i></div>
+        <h3>Recursos Humanos</h3>
+        <span>Talento & Cultura</span>
+      </div>
+      <div class="cat-card" onclick="scrollToAuth('registro')">
+        <div class="cat-icon"><i class="fas fa-briefcase"></i></div>
+        <h3>Administración</h3>
+        <span>Gestión & Operaciones</span>
+      </div>
+      <div class="cat-card" onclick="scrollToAuth('registro')">
+        <div class="cat-icon"><i class="fas fa-graduation-cap"></i></div>
+        <h3>Educación</h3>
+        <span>Docencia & Formación</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ▸ EMPRESAS -->
+  <section class="section-companies" id="empresas">
+    <div class="section-header">
+      <span class="section-eyebrow">Top contratantes</span>
+      <h2>Empresas que están contratando</h2>
+      <p>Las mejores compañías del país publican sus vacantes en Magneto</p>
+    </div>
+    <div class="companies-grid">
+      <div class="company-card">
+        <div class="company-logo">T</div>
+        <span>TechCorp</span>
+        <span class="hiring-badge">Contratando</span>
+      </div>
+      <div class="company-card">
+        <div class="company-logo">I</div>
+        <span>InnovaGroup</span>
+        <span class="hiring-badge">Contratando</span>
+      </div>
+      <div class="company-card">
+        <div class="company-logo">S</div>
+        <span>SoftLabs</span>
+        <span class="hiring-badge">Contratando</span>
+      </div>
+      <div class="company-card">
+        <div class="company-logo">D</div>
+        <span>DataSphere</span>
+        <span class="hiring-badge">Contratando</span>
+      </div>
+      <div class="company-card">
+        <div class="company-logo">C</div>
+        <span>CloudBase</span>
+        <span class="hiring-badge">Contratando</span>
+      </div>
+      <div class="company-card">
+        <div class="company-logo">N</div>
+        <span>NextWave</span>
+        <span class="hiring-badge">Contratando</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ▸ FOOTER -->
+  <footer class="site-footer">
+    <p>&copy; 2025 <strong>Magneto</strong> — Portal de Empleos Colombia. Todos los derechos reservados.</p>
+  </footer>
 
   <script src="config.js"></script>
   <script>
     if (getToken()) window.location.href = "dashboard.html";
 
+    // Navbar scroll effect
+    const nav = document.getElementById("landingNav");
+    window.addEventListener("scroll", () => {
+      nav.classList.toggle("scrolled", window.scrollY > 40);
+    });
+
+    function scrollToAuth(tab) {
+      document.getElementById("auth-section").scrollIntoView({ behavior: "smooth" });
+      setTimeout(() => mostrarTab(tab), 400);
+    }
+
     function mostrarTab(tab) {
       document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
       document.getElementById("tabLogin").classList.add("hidden");
       document.getElementById("tabRegistro").classList.add("hidden");
-
       if (tab === "login") {
         document.querySelectorAll(".tab-btn")[0].classList.add("active");
         document.getElementById("tabLogin").classList.remove("hidden");
@@ -92,7 +273,7 @@
         localStorage.setItem("user", JSON.stringify(data.user));
         window.location.href = "dashboard.html";
       } catch (err) {
-        msgEl.innerHTML = `<div class="msg msg-error">${err.message}</div>`;
+        msgEl.innerHTML = `<div class="msg msg-error"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
       }
     }
 
@@ -113,7 +294,7 @@
         localStorage.setItem("user", JSON.stringify(data.user));
         window.location.href = "profile.html";
       } catch (err) {
-        msgEl.innerHTML = `<div class="msg msg-error">${err.message}</div>`;
+        msgEl.innerHTML = `<div class="msg msg-error"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
       }
     }
   </script>

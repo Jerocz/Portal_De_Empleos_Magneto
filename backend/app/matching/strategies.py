@@ -1,15 +1,11 @@
 """
 Patrón de Diseño: Strategy (Comportamiento)
-Permite intercambiar algoritmos de matching sin modificar el código cliente.
+Sistema de puntos: cada campo que coincide suma 25 pts (máx 100).
 """
 from abc import ABC, abstractmethod
 
 
-# SOLID: Interface Segregation - la interfaz define solo el contrato mínimo necesario
-# SOLID: Open/Closed - se puede extender con nuevas estrategias sin modificar las existentes
 class MatchingStrategy(ABC):
-    """Clase base abstracta para todas las estrategias de matching."""
-
     @property
     @abstractmethod
     def name(self) -> str:
@@ -17,53 +13,59 @@ class MatchingStrategy(ABC):
 
     @abstractmethod
     def calculate(self, user_profile: dict, job: dict) -> tuple[float, str]:
-        """
-        Calcula el score de compatibilidad entre un perfil de usuario y un empleo.
-        Retorna (score 0-100, explicacion en texto).
-        """
+        """Retorna (puntos aportados 0 o 25, descripción del resultado)."""
         pass
 
 
-# SOLID: Single Responsibility - solo evalúa compatibilidad de skills
-# GRASP: Experto en Información - posee todo el conocimiento para calcular coincidencias de skills
-class SkillMatchingStrategy(MatchingStrategy):
-    """Evalúa qué porcentaje de las skills requeridas tiene el candidato."""
+class CityMatchStrategy(MatchingStrategy):
+    """Ciudad del empleo coincide (o es remoto): +25 pts."""
 
     @property
     def name(self) -> str:
-        return "skills"
+        return "city"
 
     def calculate(self, user_profile: dict, job: dict) -> tuple[float, str]:
-        user_skills = user_profile.get("skills") or []
-        job_skills = job.get("skills_required") or []
+        job_modality = (job.get("modality") or "").lower().strip()
+        if job_modality == "remote":
+            return 25.0, "Ciudad: trabajo remoto (ubicación flexible)"
 
-        if not job_skills:
-            return 0.0, "Skills: el empleo no tiene skills definidas"
-        if not user_skills:
-            return 0.0, "Skills: tu perfil no tiene skills registradas"
+        user_city = (user_profile.get("location_city") or "").lower().strip()
+        job_city = (job.get("city") or "").lower().strip()
 
-        user_set = {s.lower().strip() for s in user_skills}
-        job_set = {s.lower().strip() for s in job_skills}
+        if not user_city or not job_city:
+            return 0.0, "Ciudad: sin datos de ubicación"
 
-        coincidencias = user_set & job_set
-        score = round(len(coincidencias) / len(job_set) * 100, 2)
+        if user_city == job_city or user_city in job_city or job_city in user_city:
+            return 25.0, f"Ciudad: {job_city.title()}"
 
-        faltantes = sorted(job_set - coincidencias)
-        if coincidencias:
-            msg = (
-                f"Skills: coincides en [{', '.join(sorted(coincidencias))}]; "
-                f"faltan: [{', '.join(faltantes) or 'ninguna'}]"
-            )
-        else:
-            msg = f"Skills: sin coincidencias con [{', '.join(sorted(job_set))}]"
-
-        return score, msg
+        return 0.0, f"Ciudad: {job_city.title()} (diferente a la tuya)"
 
 
-# SOLID: Single Responsibility - solo evalúa compatibilidad salarial
-# GRASP: Experto en Información - conoce cómo calcular solapamiento de rangos
-class SalaryMatchingStrategy(MatchingStrategy):
-    """Evalúa la compatibilidad entre el rango salarial del candidato y el del empleo."""
+class ModalityMatchStrategy(MatchingStrategy):
+    """Modalidad del empleo coincide con preferencia del usuario: +25 pts."""
+
+    @property
+    def name(self) -> str:
+        return "modality"
+
+    def calculate(self, user_profile: dict, job: dict) -> tuple[float, str]:
+        user_mod = (user_profile.get("modality") or "").lower().strip()
+        job_mod = (job.get("modality") or "").lower().strip()
+
+        if not user_mod or not job_mod:
+            return 0.0, "Modalidad: sin preferencia definida"
+
+        if user_mod == job_mod:
+            return 25.0, f"Modalidad: {job_mod}"
+
+        if "hybrid" in (user_mod, job_mod):
+            return 25.0, f"Modalidad: {job_mod} (compatible con híbrido)"
+
+        return 0.0, f"Modalidad: {job_mod} (no coincide con tu preferencia)"
+
+
+class SalaryMatchStrategy(MatchingStrategy):
+    """Rango salarial del empleo cae dentro del rango del usuario: +25 pts."""
 
     @property
     def name(self) -> str:
@@ -75,106 +77,70 @@ class SalaryMatchingStrategy(MatchingStrategy):
         j_min = job.get("salary_min_cop") or 0
         j_max = job.get("salary_max_cop") or 0
 
-        # Si alguna parte no tiene datos, score neutro para no penalizar
         if not j_min and not j_max:
-            return 50.0, "Salario: el empleo no especifica rango salarial"
+            return 0.0, "Salario: el empleo no especifica salario"
         if not u_min and not u_max:
-            return 50.0, "Salario: no has especificado tu expectativa salarial"
+            return 0.0, "Salario: no definiste expectativa salarial"
 
-        # Extrapolar si solo hay un límite
-        effective_j_max = j_max if j_max else j_min * 2
-        effective_u_max = u_max if u_max else u_min * 2
+        eff_j_max = j_max or j_min * 2
+        eff_u_max = u_max or u_min * 2
 
-        overlap_start = max(u_min, j_min)
-        overlap_end = min(effective_u_max, effective_j_max)
-
+        overlap = min(eff_u_max, eff_j_max) - max(u_min, j_min)
         j_min_k = j_min // 1000
-        j_max_k = effective_j_max // 1000
+        j_max_k = eff_j_max // 1000
 
-        if overlap_start > overlap_end:
-            if u_min > effective_j_max:
-                return 0.0, (
-                    f"Salario: tu mínimo ({u_min // 1000}K COP) supera el "
-                    f"máximo del empleo ({j_max_k}K COP)"
-                )
-            return 20.0, f"Salario: el empleo ({j_min_k}K-{j_max_k}K COP) está por debajo de tu expectativa"
+        if overlap >= 0:
+            return 25.0, f"Salario: {j_min_k}K–{j_max_k}K COP (dentro de tu rango)"
 
-        total_range = effective_j_max - j_min if effective_j_max > j_min else 1
-        overlap = overlap_end - overlap_start
-        score = round(min((overlap / total_range) * 100, 100), 2)
-        return score, f"Salario: rango del empleo {j_min_k}K-{j_max_k}K COP, compatible con tu expectativa"
+        return 0.0, f"Salario: {j_min_k}K–{j_max_k}K COP (fuera de tu rango)"
 
 
-# SOLID: Single Responsibility - solo evalúa compatibilidad de modalidad
-# GRASP: Experto en Información - conoce las reglas de compatibilidad de modalidad
-class ModalityMatchingStrategy(MatchingStrategy):
-    """Evalúa si la modalidad del empleo coincide con la preferida por el candidato."""
-
-    # Mapa de compatibilidad parcial: hybrid es parcialmente compatible con ambas modalidades
-    _PARTIAL_SCORE = 50.0
+class SkillsMatchStrategy(MatchingStrategy):
+    """Al menos 1 skill del usuario coincide con las requeridas: +25 pts."""
 
     @property
     def name(self) -> str:
-        return "modality"
+        return "skills"
 
     def calculate(self, user_profile: dict, job: dict) -> tuple[float, str]:
-        user_mod = (user_profile.get("modality") or "").lower().strip()
-        job_mod = (job.get("modality") or "").lower().strip()
+        user_skills = {s.lower().strip() for s in (user_profile.get("skills") or [])}
+        job_skills = {s.lower().strip() for s in (job.get("skills_required") or [])}
 
-        if not user_mod or not job_mod:
-            return 50.0, "Modalidad: sin preferencia definida"
+        if not job_skills:
+            return 0.0, "Skills: el empleo no lista skills requeridas"
+        if not user_skills:
+            return 0.0, "Skills: no tienes skills en tu perfil"
 
-        if user_mod == job_mod:
-            return 100.0, f"Modalidad: coincide perfectamente ({job_mod})"
+        coincidencias = sorted(user_skills & job_skills)
+        faltantes = sorted(job_skills - user_skills)
 
-        # hybrid es parcialmente compatible con remote y on-site
-        if "hybrid" in (user_mod, job_mod):
-            return self._PARTIAL_SCORE, (
-                f"Modalidad: parcialmente compatible "
-                f"(tú prefieres {user_mod}, empleo es {job_mod})"
-            )
+        if coincidencias:
+            return 25.0, f"Skills: {', '.join(coincidencias)} ✓ (faltan: {', '.join(faltantes) or 'ninguna'})"
 
-        return 0.0, f"Modalidad: no coincide (tú: {user_mod}, empleo: {job_mod})"
+        return 0.0, f"Skills: sin coincidencias (requiere: {', '.join(sorted(job_skills))})"
 
 
-# SOLID: Open/Closed - se pueden agregar estrategias sin modificar esta clase
-# GRASP: Variaciones Protegidas - aísla al resto del sistema de cambios en el algoritmo de matching
-# GRASP: Indirección - actúa como mediador entre el servicio y las estrategias concretas
 class CompositeMatchingStrategy:
     """
-    Combina múltiples estrategias con pesos ponderados para generar un score final.
-    Por defecto: Skills 60%, Salario 25%, Modalidad 15%.
+    Combina las 4 estrategias de puntos (máx 100 pts = 4 campos coincidentes).
+    Ciudad 25 · Modalidad 25 · Salario 25 · Skills 25
     """
 
-    DEFAULT_WEIGHTS: dict[str, float] = {
-        "skills": 0.60,
-        "salary": 0.25,
-        "modality": 0.15,
-    }
+    def __init__(self) -> None:
+        self._strategies: list[MatchingStrategy] = [
+            CityMatchStrategy(),
+            ModalityMatchStrategy(),
+            SalaryMatchStrategy(),
+            SkillsMatchStrategy(),
+        ]
 
-    def __init__(
-        self,
-        strategies: list[tuple[MatchingStrategy, float]] | None = None,
-    ) -> None:
-        if strategies is None:
-            self._strategies: list[tuple[MatchingStrategy, float]] = [
-                (SkillMatchingStrategy(), self.DEFAULT_WEIGHTS["skills"]),
-                (SalaryMatchingStrategy(), self.DEFAULT_WEIGHTS["salary"]),
-                (ModalityMatchingStrategy(), self.DEFAULT_WEIGHTS["modality"]),
-            ]
-        else:
-            self._strategies = strategies
-
-    # SOLID: Liskov Substitution - cualquier MatchingStrategy es usable aquí sin condiciones
     def calculate(self, user_profile: dict, job: dict) -> tuple[float, str]:
-        """Retorna (score ponderado 0-100, explicacion detallada de cada criterio)."""
-        total_weight = sum(w for _, w in self._strategies)
-        weighted_score = 0.0
-        explanations: list[str] = []
+        total = 0.0
+        parts: list[str] = []
 
-        for strategy, weight in self._strategies:
-            score, msg = strategy.calculate(user_profile, job)
-            weighted_score += score * (weight / total_weight)
-            explanations.append(msg)
+        for strategy in self._strategies:
+            pts, msg = strategy.calculate(user_profile, job)
+            total += pts
+            parts.append(msg)
 
-        return round(weighted_score, 2), " | ".join(explanations)
+        return round(total, 2), " | ".join(parts)
