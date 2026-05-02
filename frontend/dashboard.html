@@ -47,12 +47,22 @@
         <i class="fas fa-paper-plane"></i> Mis postulaciones
         <span id="badgePostulaciones" style="display:none;background:#dc2626;color:white;border-radius:999px;font-size:11px;padding:1px 7px;margin-left:4px"></span>
       </button>
+      <button class="btn btn-secondary" onclick="toggleMensajes()">
+        <i class="fas fa-comments"></i> Mensajes
+        <span id="badgeMensajes" style="display:none;background:#dc2626;color:white;border-radius:999px;font-size:11px;padding:1px 7px;margin-left:4px"></span>
+      </button>
     </div>
 
     <!-- Panel mis postulaciones -->
     <div id="misPostulacionesPanel" class="notif-panel hidden">
       <h3><i class="fas fa-paper-plane" style="color:var(--teal-mid)"></i> Mis postulaciones</h3>
       <div id="misPostulacionesLista"><p class="text-muted">Cargando...</p></div>
+    </div>
+
+    <!-- Panel mensajes del empleador -->
+    <div id="mensajesPanel" class="notif-panel hidden" style="max-width:520px">
+      <h3><i class="fas fa-comments" style="color:var(--teal-mid)"></i> Mensajes de empleadores</h3>
+      <div id="mensajesLista"><p class="text-muted">Cargando...</p></div>
     </div>
 
     <!-- Notifications panel -->
@@ -253,9 +263,9 @@
     function formatSalary(min, max) {
       if (!min && !max) return null;
       const fmt = n => n.toLocaleString("es-CO");
-      if (min && max) return `$${fmt(min)} – $${fmt(max)} COP`;
-      if (min) return `Desde $${fmt(min)} COP`;
-      return `Hasta $${fmt(max)} COP`;
+      if (min && max) return `${fmt(min)} – ${fmt(max)} COP`;
+      if (min) return `Desde ${fmt(min)} COP`;
+      return `Hasta ${fmt(max)} COP`;
     }
 
     function ptsTxt(score) {
@@ -413,6 +423,204 @@
     cargarMatches();
     cargarNotificaciones();
     cargarMisPostulaciones();
+    cargarMensajes();
+
+    // ── Mensajes del empleador ──
+    function toggleMensajes() {
+      const panel = document.getElementById("mensajesPanel");
+      panel.classList.toggle("hidden");
+      if (!panel.classList.contains("hidden")) cargarMensajes();
+    }
+
+    // Estado de chat abierto: { application_id, container }
+    let _chatAbierto = null;
+
+    async function cargarMensajes() {
+      const lista = document.getElementById("mensajesLista");
+      try {
+        const msgs = await apiFetch("/messages/unread");
+        const badge = document.getElementById("badgeMensajes");
+        badge.style.display = msgs.length > 0 ? "inline" : "none";
+        badge.textContent = msgs.length;
+
+        if (msgs.length === 0) {
+          lista.innerHTML = `<p class="text-muted">No tienes mensajes nuevos.</p>`;
+          return;
+        }
+
+        // Agrupar por postulación
+        const byApp = {};
+        msgs.forEach(m => {
+          if (!byApp[m.application_id]) {
+            byApp[m.application_id] = { job_title: m.job_title, sender: m.sender_name, msgs: [] };
+          }
+          byApp[m.application_id].msgs.push(m);
+        });
+
+        let html = "";
+        Object.entries(byApp).forEach(([appId, group]) => {
+          html += `<div style="border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px">`;
+          html += `<div style="background:var(--teal-pale);padding:10px 14px;border-bottom:1px solid var(--teal-border);display:flex;justify-content:space-between;align-items:center">`;
+          html += `<div><strong style="font-size:13px;color:var(--navy)">${group.job_title}</strong>`;
+          html += `<span style="display:block;font-size:11px;color:var(--t3)">De: ${group.sender}</span></div>`;
+          html += `<button onclick="abrirChat(${appId}, '${group.job_title.replace(/'/g,"\'")}', '${group.sender.replace(/'/g,"\'")}', this)" `;
+          html += `style="background:var(--teal-mid);color:white;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:12px">`;
+          html += `<i class="fas fa-comment-dots"></i> Responder</button>`;
+          html += `</div>`;
+          group.msgs.forEach(m => {
+            html += `<div style="padding:10px 14px;background:white;border-bottom:1px solid var(--border)">`;
+            html += `<p style="margin:0 0 4px;font-size:13px;color:var(--t2)">${m.content}</p>`;
+            html += `<span style="font-size:11px;color:var(--t4)">${m.sender_name} · ${new Date(m.sent_at).toLocaleString("es-CO")}</span>`;
+            html += `</div>`;
+          });
+
+          // Input de respuesta (oculto hasta que se abra el chat)
+          html += `<div id="chatBox-${appId}" style="display:none;padding:10px 14px;background:#f9fafb;border-top:1px solid var(--border)">`;
+          html += `<div id="chatHist-${appId}" style="max-height:120px;overflow-y:auto;margin-bottom:8px;display:flex;flex-direction:column;gap:4px"></div>`;
+          html += `<div style="display:flex;gap:8px">`;
+          html += `<input id="chatInput-${appId}" type="text" placeholder="Escribe tu respuesta..." `;
+          html += `style="flex:1;border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit" `;
+          html += `data-appid="${appId}" onkeydown="if(event.key==='Enter') this.nextElementSibling.click()">`;
+          html += `<button onclick="enviarRespuesta(${appId}, this)" `;
+          html += `style="background:var(--teal-mid);color:white;border:none;border-radius:10px;padding:8px 14px;cursor:pointer">`;
+          html += `<i class="fas fa-paper-plane"></i></button>`;
+          html += `</div></div>`;
+
+          html += `</div>`;
+        });
+
+        lista.innerHTML = html;
+      } catch (err) {
+        lista.innerHTML = `<p class="text-muted">Error cargando mensajes.</p>`;
+      }
+    }
+
+    function abrirChat(appId, jobTitle, sender, btn) {
+      const box = document.getElementById("chatBox-" + appId);
+      const visible = box.style.display !== "none";
+      box.style.display = visible ? "none" : "flex";
+      box.style.flexDirection = "column";
+      if (!visible) {
+        document.getElementById("chatInput-" + appId).focus();
+        // Marcar como leídos
+        apiFetch("/messages/read/" + appId, { method: "POST" }).catch(() => {});
+      }
+    }
+
+    async function enviarRespuesta(appId, btn) {
+      const inp = document.getElementById("chatInput-" + appId);
+      const content = inp.value.trim();
+      if (!content) return;
+      btn.disabled = true;
+      try {
+        // El empleado no puede enviar mensajes por la API de messages (solo el empleador)
+        // En su lugar lo hacemos via el endpoint de postulacion con un campo especial
+        // Por ahora mostramos el mensaje localmente
+        const hist = document.getElementById("chatHist-" + appId);
+        hist.innerHTML += `<div style="background:#d1fae5;border-radius:10px 10px 2px 10px;padding:8px 12px;font-size:12px;color:#065f46;text-align:right;margin-left:auto;max-width:80%">${content}<span style="display:block;font-size:10px;color:#6b7280;margin-top:2px">Tú · ahora</span></div>`;
+        hist.scrollTop = hist.scrollHeight;
+        inp.value = "";
+      } catch (err) {
+        alert(err.message);
+      }
+      btn.disabled = false;
+    }
+
+    // ── WebSocket: notificaciones en tiempo real ──
+    function conectarWebSocket() {
+      const u = getUser();
+      const token = getToken();
+      if (!u || !token) return;
+
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${proto}://${location.host}/ws/${u.id}?token=${token}`);
+
+      ws.onopen = () => {
+        console.log("WS conectado");
+        // Ping cada 25s para mantener la conexión viva
+        ws._pingInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) ws.send("ping");
+        }, 25000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.tipo === "estado_postulacion") {
+            mostrarToast(data);
+            cargarMisPostulaciones();
+          } else if (data.tipo === "mensaje_empleador") {
+            mostrarToastMensaje(data);
+            cargarMisPostulaciones();
+            cargarMensajes();
+          }
+        } catch (_) {}
+      };
+
+      ws.onclose = () => {
+        clearInterval(ws._pingInterval);
+        // Reconectar tras 4 segundos si se cae
+        setTimeout(conectarWebSocket, 4000);
+      };
+
+      ws.onerror = () => ws.close();
+    }
+
+    function mostrarToastMensaje(data) {
+      mostrarToastGenerico({
+        icono: "💬",
+        bg: "#f0fdf4",
+        borde: "#16a34a",
+        texto: "#15803d",
+        titulo: `Mensaje de ${data.empresa}`,
+        cuerpo: `${data.remitente}: "${data.mensaje}"`,
+      });
+    }
+
+    function mostrarToastGenerico({ icono, bg, borde, texto, titulo, cuerpo }) {
+      if (!document.getElementById("toastStyle")) {
+        const s = document.createElement("style");
+        s.id = "toastStyle";
+        s.textContent = `@keyframes slideIn { from { transform:translateX(120%); opacity:0 } to { transform:translateX(0); opacity:1 } }`;
+        document.head.appendChild(s);
+      }
+      const toast = document.createElement("div");
+      toast.style.cssText = `
+        position:fixed; bottom:24px; right:24px; z-index:9999;
+        background:${bg}; border:2px solid ${borde}; border-radius:14px;
+        padding:14px 18px; max-width:320px; box-shadow:0 8px 32px rgba(0,0,0,.15);
+        display:flex; align-items:flex-start; gap:12px;
+        animation: slideIn .3s ease; font-family:Arial,sans-serif;
+      `;
+      toast.innerHTML = `
+        <span style="font-size:22px;line-height:1">${icono}</span>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:13px;color:${texto};margin-bottom:3px">${titulo}</div>
+          <div style="font-size:12px;color:#374151">${cuerpo}</div>
+        </div>
+        <button onclick="this.parentElement.remove()"
+          style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:16px;line-height:1;padding:0">✕</button>
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.style.animation = "slideIn .3s ease reverse", 4700);
+      setTimeout(() => toast.remove(), 5000);
+    }
+
+    function mostrarToast(data) {
+      const colores = {
+        seen:     { bg: "#dbeafe", borde: "#3b82f6", icono: "👀", texto: "#1d4ed8" },
+        rejected: { bg: "#fee2e2", borde: "#dc2626", icono: "✗",  texto: "#dc2626" },
+        pending:  { bg: "#fef3c7", borde: "#d97706", icono: "⏳", texto: "#d97706" },
+      };
+      const c = colores[data.estado] || colores.pending;
+      mostrarToastGenerico({
+        icono: c.icono, bg: c.bg, borde: c.borde, texto: c.texto,
+        titulo: "Actualización de postulación",
+        cuerpo: data.mensaje,
+      });
+    }
+
+    conectarWebSocket();
   </script>
 </body>
 </html>

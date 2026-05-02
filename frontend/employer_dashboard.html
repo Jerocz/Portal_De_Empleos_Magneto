@@ -115,6 +115,49 @@
 
   </div>
 
+  <!-- ▸ MODAL EDITAR VACANTE -->
+  <div id="modalEditar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;overflow-y:auto;padding:20px">
+    <div style="background:white;border-radius:18px;padding:32px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2);position:relative">
+      <button onclick="cerrarEditar()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--t3)">✕</button>
+      <h3 style="margin:0 0 20px;color:var(--navy);font-size:17px"><i class="fas fa-pen" style="color:var(--teal-mid)"></i> Editar vacante</h3>
+      <div id="editMsg"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div><label style="font-size:12px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">Título *</label>
+          <input id="editTitle" type="text" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;box-sizing:border-box"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">Empresa *</label>
+          <input id="editCompany" type="text" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;box-sizing:border-box"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">Ciudad</label>
+          <input id="editCity" type="text" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;box-sizing:border-box"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">Modalidad</label>
+          <select id="editModality" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;box-sizing:border-box">
+            <option value="presencial">🏢 Presencial</option>
+            <option value="remote">🌐 Remoto</option>
+            <option value="hybrid">🏠 Híbrido</option>
+          </select></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">Salario mínimo (COP)</label>
+          <input id="editSalMin" type="number" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;box-sizing:border-box"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">Salario máximo (COP)</label>
+          <input id="editSalMax" type="number" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;box-sizing:border-box"></div>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">Descripción</label>
+        <textarea id="editDesc" rows="3" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit"></textarea>
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px">Habilidades requeridas</label>
+        <div id="editSkillsContainer" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+        <input id="editSkillInput" type="text" placeholder="Escribe y presiona Enter o coma"
+          style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;box-sizing:border-box">
+      </div>
+      <div style="display:flex;gap:10px">
+        <button onclick="cerrarEditar()" style="flex:0 0 auto;padding:11px 18px;border:1.5px solid var(--border);border-radius:10px;background:white;cursor:pointer;font-size:13px;color:var(--t3)">Cancelar</button>
+        <button id="btnGuardarEdicion" onclick="guardarEdicion()" style="flex:1;background:var(--teal-mid);color:white;border:none;border-radius:10px;padding:11px;cursor:pointer;font-size:13px;font-weight:600">
+          <i class="fas fa-floppy-disk"></i> Guardar cambios
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="config.js"></script>
   <script>
     requireAuth();
@@ -164,9 +207,9 @@
     function formatSalary(min, max) {
       if (!min && !max) return null;
       const fmt = n => n.toLocaleString("es-CO");
-      if (min && max) return `$${fmt(min)} – $${fmt(max)} COP`;
-      if (min) return `Desde $${fmt(min)} COP`;
-      return `Hasta $${fmt(max)} COP`;
+      if (min && max) return `${fmt(min)} – ${fmt(max)} COP`;
+      if (min) return `Desde ${fmt(min)} COP`;
+      return `Hasta ${fmt(max)} COP`;
     }
 
     async function publicarEmpleo(e) {
@@ -201,10 +244,16 @@
       }
     }
 
+    // Mapa global de jobs por ID — evita pasar JSON en onclick
+    const _jobsMap = {};
+
     async function cargarMisEmpleos() {
       const cont = document.getElementById("myJobsContainer");
       try {
         const jobs = await apiFetch("/jobs/my-jobs");
+
+        // Guardar en mapa para acceso seguro desde onclick
+        jobs.forEach(j => { _jobsMap[j.id] = j; });
 
         const n = jobs.length;
         document.getElementById("welcome-sub").textContent =
@@ -223,7 +272,7 @@
         cont.innerHTML = `<div class="jobs-grid">${jobs.map(j => {
           const salary = formatSalary(j.salary_min_cop, j.salary_max_cop);
           return `
-            <div class="job-card">
+            <div class="job-card" id="jcard-${j.id}">
               <div class="job-card-top">
                 <div class="job-avatar">${j.company.charAt(0).toUpperCase()}</div>
                 <div class="job-main">
@@ -243,7 +292,22 @@
               <div class="job-card-footer">
                 ${salary ? `<p class="job-salary"><i class="fas fa-peso-sign"></i> ${salary}</p>` : `<span></span>`}
                 <span class="employer-job-tag"><i class="fas fa-circle-check"></i> Publicado</span>
-                <button onclick="eliminarVacante(${j.id}, this)" style="background:none;border:1px solid #fca5a5;color:#dc2626;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px;transition:all .2s" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'"><i class="fas fa-trash-can"></i> Eliminar</button>
+                <button onclick="abrirEditar(_jobsMap[${j.id}])"
+                  style="background:none;border:1px solid #bfdbfe;color:#2563eb;border-radius:8px;
+                         padding:5px 12px;cursor:pointer;font-size:12px;display:flex;
+                         align-items:center;gap:5px;transition:all .2s"
+                  onmouseover="this.style.background='#eff6ff'"
+                  onmouseout="this.style.background='none'">
+                  <i class="fas fa-pen"></i> Editar
+                </button>
+                <button onclick="eliminarVacante(${j.id}, this)"
+                  style="background:none;border:1px solid #fca5a5;color:#dc2626;border-radius:8px;
+                         padding:5px 12px;cursor:pointer;font-size:12px;display:flex;
+                         align-items:center;gap:5px;transition:all .2s"
+                  onmouseover="this.style.background='#fef2f2'"
+                  onmouseout="this.style.background='none'">
+                  <i class="fas fa-trash-can"></i> Eliminar
+                </button>
               </div>
             </div>`;
         }).join("")}</div>`;
@@ -268,6 +332,108 @@
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-trash-can"></i> Eliminar';
       }
+    }
+
+    // ── EDITAR VACANTE ──
+    let _editJobId = null;
+
+    function abrirEditar(j) {
+      _editJobId = j.id;
+      document.getElementById("editTitle").value      = j.title || "";
+      document.getElementById("editCompany").value    = j.company || "";
+      document.getElementById("editCity").value       = j.city || "";
+      document.getElementById("editModality").value   = j.modality || "presencial";
+      document.getElementById("editSalMin").value     = j.salary_min_cop || "";
+      document.getElementById("editSalMax").value     = j.salary_max_cop || "";
+      document.getElementById("editDesc").value       = j.description || "";
+      // Skills
+      _editSkills = [...(j.skills_required || [])];
+      renderEditSkills();
+      document.getElementById("editMsg").innerHTML = "";
+      document.getElementById("modalEditar").style.display = "flex";
+    }
+
+    function cerrarEditar() {
+      document.getElementById("modalEditar").style.display = "none";
+    }
+
+    let _editSkills = [];
+
+    function renderEditSkills() {
+      const cont = document.getElementById("editSkillsContainer");
+      cont.innerHTML = _editSkills.map((s, i) => `
+        <span style="background:var(--teal-pale);border:1px solid var(--teal-border);border-radius:20px;
+              padding:4px 12px;font-size:13px;display:inline-flex;align-items:center;gap:6px">
+          ${s}
+          <button onclick="_editSkills.splice(${i},1);renderEditSkills()"
+            style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:14px;padding:0;line-height:1">×</button>
+        </span>`).join("");
+    }
+
+    document.addEventListener("keydown", function(e) {
+      const inp = document.getElementById("editSkillInput");
+      if (document.activeElement !== inp) return;
+      if ((e.key === "Enter" || e.key === ",") && inp.value.trim()) {
+        e.preventDefault();
+        _editSkills.push(inp.value.trim());
+        inp.value = "";
+        renderEditSkills();
+      }
+    });
+
+    async function guardarEdicion() {
+      const btn = document.getElementById("btnGuardarEdicion");
+      const msgEl = document.getElementById("editMsg");
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+      try {
+        await apiFetch(`/jobs/${_editJobId}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            title:          document.getElementById("editTitle").value,
+            company:        document.getElementById("editCompany").value,
+            city:           document.getElementById("editCity").value,
+            modality:       document.getElementById("editModality").value,
+            description:    document.getElementById("editDesc").value,
+            salary_min_cop: parseInt(document.getElementById("editSalMin").value) || null,
+            salary_max_cop: parseInt(document.getElementById("editSalMax").value) || null,
+            skills_required: _editSkills,
+          }),
+        });
+        msgEl.innerHTML = `<div class="msg msg-success" style="margin-bottom:8px"><i class="fas fa-circle-check"></i> Vacante actualizada.</div>`;
+        setTimeout(() => { cerrarEditar(); cargarMisEmpleos(); }, 1200);
+      } catch (err) {
+        msgEl.innerHTML = `<div class="msg msg-error" style="margin-bottom:8px"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-floppy-disk"></i> Guardar cambios';
+      }
+    }
+
+    // ── MENSAJES EMPLEADOR → EMPLEADO ──
+    async function enviarMensaje(applicationId, btn) {
+      const inp = document.querySelector(`[data-appid="${applicationId}"]`) || document.getElementById("msgInput-" + applicationId);
+      const content = inp.value.trim();
+      if (!content) return;
+      btn.disabled = true;
+      try {
+        await apiFetch("/messages/send", {
+          method: "POST",
+          body: JSON.stringify({ application_id: applicationId, content }),
+        });
+        inp.value = "";
+        // Agregar el mensaje visualmente sin recargar
+        const hist = document.getElementById(`msgHist-${applicationId}`);
+        hist.innerHTML += `
+          <div style="background:#d1fae5;border-radius:10px 10px 2px 10px;padding:8px 12px;
+                      margin-bottom:6px;font-size:12px;color:#065f46;max-width:80%;margin-left:auto;text-align:right">
+            ${content}
+            <span style="display:block;font-size:10px;color:#6b7280;margin-top:2px">Tú · ahora</span>
+          </div>`;
+        hist.scrollTop = hist.scrollHeight;
+      } catch (err) {
+        alert("Error al enviar: " + err.message);
+      }
+      btn.disabled = false;
     }
 
     // ── Bandeja de postulaciones ──
@@ -306,23 +472,15 @@
       cont.innerHTML = `<p class="text-muted"><i class="fas fa-spinner fa-spin"></i> &nbsp;Cargando...</p>`;
       try {
         const apps = await apiFetch("/applications/inbox");
-
-        // Badge en navbar
         const badge = document.getElementById("inboxBadge");
         const pending = apps.filter(a => a.status === "pending").length;
         badge.style.display = pending > 0 ? "inline" : "none";
         badge.textContent = pending;
-
         document.getElementById("inboxCount").textContent =
           apps.length > 0 ? `(${apps.length} postulación${apps.length > 1 ? "es" : ""})` : "";
 
         if (apps.length === 0) {
-          cont.innerHTML = `
-            <div class="empty-state">
-              <span class="empty-icon">📬</span>
-              <h3>Sin postulaciones todavía</h3>
-              <p>Cuando un empleado se postule a tus vacantes, aparecerá aquí.</p>
-            </div>`;
+          cont.innerHTML = `<div class="empty-state"><span class="empty-icon">📬</span><h3>Sin postulaciones todavía</h3><p>Cuando un empleado se postule aparecerá aquí.</p></div>`;
           return;
         }
 
@@ -333,58 +491,154 @@
           byJob[a.job_id].apps.push(a);
         });
 
-        cont.innerHTML = Object.entries(byJob).map(([jobId, group]) => `
-          <div style="border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px">
-            <div style="background:var(--teal-pale);padding:12px 18px;border-bottom:1px solid var(--teal-border)">
-              <strong style="color:var(--navy);font-size:14px"><i class="fas fa-briefcase" style="color:var(--teal-mid)"></i> ${group.title}</strong>
-              <span style="font-size:12px;color:var(--t3);margin-left:8px">${group.company} · ${group.apps.length} candidato${group.apps.length > 1 ? "s" : ""}</span>
-            </div>
-            ${group.apps.map(a => `
-              <div style="padding:16px 18px;border-bottom:1px solid var(--border);background:white">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
-                  <div>
-                    <strong style="color:var(--navy);font-size:14px"><i class="fas fa-user-circle" style="color:var(--teal-mid)"></i> ${a.candidate_name}</strong>
-                    <span style="display:block;font-size:12px;color:var(--t3);margin-top:2px"><i class="fas fa-envelope"></i> ${a.candidate_email}</span>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                    ${statusBadge(a.status)}
-                    <span style="font-size:11px;color:var(--t4)">${new Date(a.applied_at).toLocaleDateString("es-CO")}</span>
-                  </div>
-                </div>
+        const fmtK = n => n ? (n/1000).toFixed(0) + "K" : "?";
 
-                <!-- Info del perfil del candidato -->
-                <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px">
-                  ${a.location_city ? `<span style="font-size:12px;color:var(--t3)"><i class="fas fa-location-dot"></i> ${a.location_city}</span>` : ""}
-                  ${a.candidate_modality ? `<span style="font-size:12px;color:var(--t3)"><i class="fas fa-laptop-house"></i> ${a.candidate_modality}</span>` : ""}
-                  ${a.years_exp ? `<span style="font-size:12px;color:var(--t3)"><i class="fas fa-briefcase"></i> ${a.years_exp} año${a.years_exp > 1 ? "s" : ""} exp.</span>` : ""}
-                  ${a.candidate_sal_min ? `<span style="font-size:12px;color:var(--t3)"><i class="fas fa-peso-sign"></i> ${(a.candidate_sal_min/1000).toFixed(0)}K – ${a.candidate_sal_max ? (a.candidate_sal_max/1000).toFixed(0)+"K" : "?"} COP</span>` : ""}
-                </div>
+        let html = "";
+        Object.entries(byJob).forEach(([jobId, group]) => {
+          html += `<div style="border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px">`;
+          html += `<div style="background:var(--teal-pale);padding:12px 18px;border-bottom:1px solid var(--teal-border)">`;
+          html += `<strong style="color:var(--navy);font-size:14px"><i class="fas fa-briefcase" style="color:var(--teal-mid)"></i> ${group.title}</strong>`;
+          html += `<span style="font-size:12px;color:var(--t3);margin-left:8px">${group.company} · ${group.apps.length} candidato${group.apps.length > 1 ? "s" : ""}</span>`;
+          html += `</div>`;
 
-                ${(a.skills || []).length > 0 ? `
-                  <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
-                    ${a.skills.map(s => `<span class="skill-tag">${s}</span>`).join("")}
-                  </div>` : ""}
+          group.apps.forEach(a => {
+            const skills = (a.skills || []);
+            html += `<div style="padding:16px 18px;border-bottom:1px solid var(--border);background:white">`;
 
-                ${a.message ? `<blockquote style="margin:10px 0 0;padding:8px 12px;border-left:3px solid var(--teal-mid);background:var(--teal-pale);border-radius:0 8px 8px 0;font-size:13px;color:var(--t2);font-style:italic">${a.message}</blockquote>` : ""}
+            // Cabecera candidato
+            html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">`;
+            html += `<div><strong style="color:var(--navy)">${a.candidate_name}</strong>`;
+            html += `<span style="display:block;font-size:12px;color:var(--t3)"><i class="fas fa-envelope"></i> ${a.candidate_email}</span></div>`;
+            html += `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">`;
+            html += statusBadge(a.status);
+            html += `<span style="font-size:11px;color:var(--t4)">${new Date(a.applied_at).toLocaleDateString("es-CO")}</span>`;
+            html += `</div></div>`;
 
-                <!-- Acciones -->
-                <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-                  ${a.status !== "seen" ? `<button onclick="cambiarEstado(${a.application_id},'seen',this)" style="background:#dbeafe;color:#1d4ed8;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600"><i class="fas fa-eye"></i> Marcar visto</button>` : ""}
-                  ${a.status !== "rejected" ? `<button onclick="cambiarEstado(${a.application_id},'rejected',this)" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600"><i class="fas fa-xmark"></i> Rechazar</button>` : ""}
-                  ${a.status !== "pending" ? `<button onclick="cambiarEstado(${a.application_id},'pending',this)" style="background:#f3f4f6;color:#6b7280;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600"><i class="fas fa-rotate-left"></i> Pendiente</button>` : ""}
-                </div>
-              </div>
-            `).join("")}
-          </div>
-        `).join("");
+            // Info perfil
+            html += `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px">`;
+            if (a.location_city) html += `<span style="font-size:12px;color:var(--t3)"><i class="fas fa-location-dot"></i> ${a.location_city}</span>`;
+            if (a.candidate_modality) html += `<span style="font-size:12px;color:var(--t3)"><i class="fas fa-laptop-house"></i> ${a.candidate_modality}</span>`;
+            if (a.years_exp) html += `<span style="font-size:12px;color:var(--t3)"><i class="fas fa-briefcase"></i> ${a.years_exp} año${a.years_exp > 1 ? "s" : ""} exp.</span>`;
+            if (a.candidate_sal_min) html += `<span style="font-size:12px;color:var(--t3)"><i class="fas fa-peso-sign"></i> ${fmtK(a.candidate_sal_min)} – ${fmtK(a.candidate_sal_max)} COP</span>`;
+            html += `</div>`;
+
+            // Skills
+            if (skills.length > 0) {
+              html += `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">`;
+              skills.forEach(s => { html += `<span class="skill-tag">${s}</span>`; });
+              html += `</div>`;
+            }
+
+            // Mensaje del candidato
+            if (a.message) {
+              html += `<blockquote style="margin:10px 0 0;padding:8px 12px;border-left:3px solid var(--teal-mid);background:var(--teal-pale);border-radius:0 8px 8px 0;font-size:13px;color:var(--t2);font-style:italic">${a.message}</blockquote>`;
+            }
+
+            // Botones de estado
+            html += `<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">`;
+            if (a.status !== "seen")
+              html += `<button onclick="cambiarEstado(${a.application_id},'seen',this)" style="background:#dbeafe;color:#1d4ed8;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600"><i class="fas fa-eye"></i> Marcar visto</button>`;
+            if (a.status !== "rejected")
+              html += `<button onclick="cambiarEstado(${a.application_id},'rejected',this)" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600"><i class="fas fa-xmark"></i> Rechazar</button>`;
+            if (a.status !== "pending")
+              html += `<button onclick="cambiarEstado(${a.application_id},'pending',this)" style="background:#f3f4f6;color:#6b7280;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600"><i class="fas fa-rotate-left"></i> Pendiente</button>`;
+            html += `</div>`;
+
+            // Sección mensaje empleador → empleado
+            html += `<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">`;
+            html += `<p style="font-size:12px;font-weight:600;color:var(--navy);margin:0 0 8px"><i class="fas fa-comment" style="color:var(--teal-mid)"></i> Enviar mensaje a ${a.candidate_name.split(" ")[0]}</p>`;
+            html += `<div id="msgHist-${a.application_id}" style="max-height:140px;overflow-y:auto;margin-bottom:8px;display:flex;flex-direction:column;gap:4px"></div>`;
+            html += `<div style="display:flex;gap:8px">`;
+            html += '<input id="msgInput-' + a.application_id + '" type="text" placeholder="Escribe un mensaje..." style="flex:1;border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit" data-appid="' + a.application_id + '" onkeydown="if(event.key===\'Enter\') this.nextElementSibling.click()">';
+            html += '<button onclick="enviarMensaje(' + a.application_id + ', this)" style="background:var(--teal-mid);color:white;border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font-size:13px"><i class="fas fa-paper-plane"></i></button>';
+            html += `</div></div>`;
+
+            html += `</div>`; // cierre card candidato
+          });
+
+          html += `</div>`; // cierre grupo vacante
+        });
+
+        cont.innerHTML = html;
 
       } catch (err) {
         cont.innerHTML = `<div class="msg msg-error"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
       }
     }
-
     cargarMisEmpleos();
     cargarInbox();
+
+    // ── WebSocket: notificaciones en tiempo real para el empleador ──
+    function conectarWebSocketEmployer() {
+      const u = getUser();
+      const token = getToken();
+      if (!u || !token) return;
+
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${proto}://${location.host}/ws/${u.id}?token=${token}`);
+
+      ws.onopen = () => {
+        ws._ping = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send("ping"); }, 25000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.tipo === "nueva_postulacion") {
+            mostrarToastEmployer({
+              icono: "🙋",
+              bg: "#f0fdf4",
+              borde: "#16a34a",
+              texto: "#15803d",
+              titulo: "Nueva postulación recibida",
+              cuerpo: data.mensaje,
+            });
+            cargarInbox(); // Actualizar bandeja automáticamente
+            // Actualizar badge
+            const badge = document.getElementById("inboxBadge");
+            const actual = parseInt(badge.textContent || "0");
+            badge.style.display = "inline";
+            badge.textContent = actual + 1;
+          }
+        } catch (_) {}
+      };
+
+      ws.onclose = () => {
+        clearInterval(ws._ping);
+        setTimeout(conectarWebSocketEmployer, 4000);
+      };
+      ws.onerror = () => ws.close();
+    }
+
+    function mostrarToastEmployer({ icono, bg, borde, texto, titulo, cuerpo }) {
+      if (!document.getElementById("toastStyleEmp")) {
+        const s = document.createElement("style");
+        s.id = "toastStyleEmp";
+        s.textContent = `@keyframes slideInEmp { from { transform:translateX(120%); opacity:0 } to { transform:translateX(0); opacity:1 } }`;
+        document.head.appendChild(s);
+      }
+      const toast = document.createElement("div");
+      toast.style.cssText = `
+        position:fixed; bottom:24px; right:24px; z-index:9999;
+        background:${bg}; border:2px solid ${borde}; border-radius:14px;
+        padding:14px 18px; max-width:320px; box-shadow:0 8px 32px rgba(0,0,0,.15);
+        display:flex; align-items:flex-start; gap:12px;
+        animation: slideInEmp .3s ease; font-family:Arial,sans-serif;
+      `;
+      toast.innerHTML = `
+        <span style="font-size:22px;line-height:1">${icono}</span>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:13px;color:${texto};margin-bottom:3px">${titulo}</div>
+          <div style="font-size:12px;color:#374151">${cuerpo}</div>
+        </div>
+        <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:16px;line-height:1;padding:0">✕</button>
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.style.animation = "slideInEmp .3s ease reverse", 4700);
+      setTimeout(() => toast.remove(), 5000);
+    }
+
+    conectarWebSocketEmployer();
   </script>
 </body>
 </html>
