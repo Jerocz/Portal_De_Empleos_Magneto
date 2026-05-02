@@ -4,18 +4,18 @@ Sistema de puntos: cada campo que coincide suma 25 pts (máx 100).
 Las explicaciones usan prefijo 'OK:' o 'NO:' para que el frontend
 pueda determinar si cada criterio coincidió sin ambigüedad.
 
-Comparaciones normalizadas: sin tildes, minúsculas, sin espacios extra,
-para que "Medellín", "medellin", "MEDELLÍN" sean equivalentes.
+Comparaciones normalizadas: sin tildes, minúsculas, sin espacios extra.
+Skills: búsqueda semántica mediante tabla de sinónimos (synonyms.py).
 """
 from abc import ABC, abstractmethod
 import unicodedata
+from app.matching.synonyms import canonicalize, canonicalize_set
 
 
 def _normalize(text: str) -> str:
     """Convierte a minúsculas, elimina tildes/diacríticos y espacios extra."""
     if not text:
         return ""
-    # Descompone caracteres con tilde (á → a + combining accent) y descarta el acento
     nfkd = unicodedata.normalize("NFKD", text)
     sin_tildes = "".join(c for c in nfkd if not unicodedata.combining(c))
     return sin_tildes.lower().strip()
@@ -29,8 +29,8 @@ class MatchingStrategy(ABC):
 
     @abstractmethod
     def calculate(self, user_profile: dict, job: dict) -> tuple[float, str]:
-        """Retorna (puntos aportados 0 o 25, descripción del resultado).
-        El string comienza con 'OK:' si coincide, o 'NO:' si no coincide."""
+        """Retorna (puntos 0 o 25, descripción).
+        El string comienza con 'OK:' si coincide, o 'NO:' si no."""
         pass
 
 
@@ -53,7 +53,6 @@ class CityMatchStrategy(MatchingStrategy):
             return 0.0, "NO:Ciudad: sin datos de ubicación"
 
         if user_city == job_city or user_city in job_city or job_city in user_city:
-            # Mostrar el nombre original (sin normalizar) para mejor legibilidad
             display = (job.get("city") or "").strip().title()
             return 25.0, f"OK:Ciudad: {display}"
 
@@ -116,16 +115,20 @@ class SalaryMatchStrategy(MatchingStrategy):
 
 
 class SkillsMatchStrategy(MatchingStrategy):
-    """Al menos 1 skill del usuario coincide con las requeridas: +25 pts."""
+    """
+    Búsqueda semántica de skills: usa tabla de sinónimos para canonicalizar
+    antes de comparar. 'JS' y 'JavaScript' se tratan como la misma skill.
+    Al menos 1 coincidencia canónica = +25 pts.
+    """
 
     @property
     def name(self) -> str:
         return "skills"
 
     def calculate(self, user_profile: dict, job: dict) -> tuple[float, str]:
-        # Normalizar cada skill individualmente
-        user_skills = {_normalize(s) for s in (user_profile.get("skills") or []) if s}
-        job_skills  = {_normalize(s) for s in (job.get("skills_required") or []) if s}
+        # Canonicalizar: "JS" → "javascript", "Postgres" → "postgresql"
+        user_skills = canonicalize_set(user_profile.get("skills") or [])
+        job_skills  = canonicalize_set(job.get("skills_required") or [])
 
         if not job_skills:
             return 0.0, "NO:Skills: el empleo no lista skills requeridas"
@@ -146,7 +149,7 @@ class SkillsMatchStrategy(MatchingStrategy):
 
 class CompositeMatchingStrategy:
     """
-    Combina las 4 estrategias de puntos (máx 100 pts = 4 campos coincidentes).
+    Combina las 4 estrategias (máx 100 pts).
     Ciudad 25 · Modalidad 25 · Salario 25 · Skills 25
     """
 

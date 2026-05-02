@@ -116,3 +116,57 @@ class ApplicationRepository:
         )
         self._db.commit()
         return result.rowcount > 0
+
+    def update_status_with_employee(
+        self, application_id: int, employer_id: int, status: str
+    ) -> dict | None:
+        """
+        Cambia el estado y retorna {employee_id, job_title} para poder
+        enviar la notificación WebSocket al empleado correcto.
+        """
+        row = self._db.execute(
+            text("""
+                SELECT a.employee_id, j.title AS job_title
+                FROM applications a
+                JOIN jobs j ON j.id = a.job_id
+                WHERE a.id = :aid AND j.posted_by = :emp
+            """),
+            {"aid": application_id, "emp": employer_id},
+        ).fetchone()
+
+        if not row:
+            return None
+
+        self._db.execute(
+            text("UPDATE applications SET status = :status WHERE id = :aid"),
+            {"status": status, "aid": application_id},
+        )
+        self._db.commit()
+
+        return {"employee_id": row.employee_id, "job_title": row.job_title}
+
+    def find_by_id_for_employer(self, application_id: int, employer_id: int) -> dict | None:
+        """Retorna la postulación solo si pertenece a una vacante del empleador."""
+        row = self._db.execute(
+            text("""
+                SELECT a.id, a.employee_id, j.title AS job_title, j.company
+                FROM applications a
+                JOIN jobs j ON j.id = a.job_id
+                WHERE a.id = :aid AND j.posted_by = :emp
+            """),
+            {"aid": application_id, "emp": employer_id},
+        ).fetchone()
+        return dict(row._mapping) if row else None
+
+    def find_job_employer(self, job_id: int, db=None) -> dict | None:
+        """Retorna el employer_id y título del empleo para notificaciones."""
+        row = self._db.execute(
+            text("""
+                SELECT j.posted_by AS employer_id, j.title AS job_title
+                FROM jobs j
+                WHERE j.id = :jid
+            """),
+            {"jid": job_id},
+        ).fetchone()
+        return dict(row._mapping) if row else None
+

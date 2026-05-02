@@ -98,3 +98,42 @@ class JobRepository:
         )
         self._db.commit()
         return result.rowcount > 0
+
+    def update(
+        self,
+        job_id: int,
+        owner_id: int,
+        title: str,
+        company: str,
+        city: str | None,
+        modality: str | None,
+        description: str | None,
+        salary_min_cop: int | None,
+        salary_max_cop: int | None,
+        skills_required: list,
+    ) -> dict | None:
+        """Actualiza una vacante si pertenece al owner. Retorna el empleo actualizado."""
+        result = self._db.execute(
+            text("""
+                UPDATE jobs SET
+                    title          = :title,
+                    company        = :company,
+                    city           = :city,
+                    modality       = :modality,
+                    description    = :desc,
+                    salary_min_cop = :smin,
+                    salary_max_cop = :smax,
+                    skills_required = :skills
+                WHERE id = :id AND posted_by = :owner
+            """),
+            {
+                "title": title, "company": company, "city": city,
+                "modality": modality, "desc": description,
+                "smin": salary_min_cop, "smax": salary_max_cop,
+                "skills": json.dumps(skills_required), "id": job_id, "owner": owner_id,
+            },
+        )
+        self._db.commit()
+        if result.rowcount == 0:
+            return None
+        return self.find_by_id(job_id)

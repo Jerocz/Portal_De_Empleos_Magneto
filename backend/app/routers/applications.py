@@ -5,8 +5,16 @@ from typing import Optional
 from app.deps import get_db
 from app.security import get_current_user
 from app.repositories.application_repository import ApplicationRepository
+from app.websocket_manager import manager
 
 router = APIRouter(prefix="/applications", tags=["Postulaciones"])
+
+# Mensajes legibles por estado
+STATUS_LABELS = {
+    "seen":     "👀 El empleador vio tu postulación",
+    "rejected": "✗ Tu postulación fue rechazada",
+    "pending":  "⏳ Tu postulación volvió a estado pendiente",
+}
 
 
 class ApplyData(BaseModel):
@@ -15,11 +23,11 @@ class ApplyData(BaseModel):
 
 
 class StatusUpdate(BaseModel):
-    status: str  # seen | rejected
+    status: str  # seen | rejected | pending
 
 
 @router.post("/")
-def apply_to_job(
+async def apply_to_job(
     data: ApplyData,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -32,6 +40,17 @@ def apply_to_job(
         raise HTTPException(status_code=400, detail="Ya te postulaste a esta vacante")
 
     app = repo.create(data.job_id, current_user["id"], data.message)
+
+    # ── Notificar al empleador en tiempo real ──
+    info = repo.find_job_employer(data.job_id, db)
+    if info:
+        await manager.send_to(info["employer_id"], {
+            "tipo":       "nueva_postulacion",
+            "vacante":    info["job_title"],
+            "candidato":  current_user["full_name"],
+            "mensaje":    f"{current_user['full_name']} se postuló a '{info['job_title']}'",
+        })
+
     return {"message": "Postulación enviada correctamente", "application_id": app["id"]}
 
 
@@ -58,7 +77,7 @@ def employer_inbox(
 
 
 @router.patch("/{application_id}/status")
-def update_status(
+async def update_status(
     application_id: int,
     data: StatusUpdate,
     current_user: dict = Depends(get_current_user),
@@ -68,10 +87,26 @@ def update_status(
         raise HTTPException(status_code=403, detail="Solo contratantes pueden actualizar el estado")
     if data.status not in ("seen", "rejected", "pending"):
         raise HTTPException(status_code=400, detail="Estado inválido")
+
     repo = ApplicationRepository(db)
-    updated = repo.update_status(application_id, current_user["id"], data.status)
-    if not updated:
+    result = repo.update_status_with_employee(application_id, current_user["id"], data.status)
+
+    if not result:
         raise HTTPException(status_code=404, detail="Postulación no encontrada")
+
+    # ── Notificación WebSocket en tiempo real ──
+    employee_id  = result["employee_id"]
+    job_title    = result["job_title"]
+    label        = STATUS_LABELS.get(data.status, data.status)
+
+    await manager.send_to(employee_id, {
+        "tipo":        "estado_postulacion",
+        "application_id": application_id,
+        "vacante":     job_title,
+        "estado":      data.status,
+        "mensaje":     f"{label} para '{job_title}'",
+    })
+
     return {"message": "Estado actualizado"}
 
 

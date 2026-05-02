@@ -8,6 +8,18 @@ from app.repositories.match_repository import MatchRepository
 # SOLID: Single Responsibility - solo gestiona la lógica de notificaciones
 router = APIRouter(prefix="/notifications", tags=["Notificaciones"])
 
+
+def _limpiar_explicacion(exp: str) -> str:
+    """Convierte 'OK:Ciudad: Medellín | NO:Skills: ...' en texto legible sin prefijos."""
+    if not exp:
+        return ""
+    partes = []
+    for parte in exp.split(" | "):
+        texto = parte.replace("OK:", "✓ ").replace("NO:", "✗ ").strip()
+        partes.append(texto)
+    return " · ".join(partes)
+
+
 # Umbral mínimo de score para considerar una notificación relevante
 SCORE_MINIMO = 60
 
@@ -23,7 +35,7 @@ def get_notifications(current_user: dict = Depends(get_current_user), db: Sessio
         {
             "id": n["id"],
             "titulo": f"Match con {n['title']} en {n['company']}",
-            "mensaje": n["explanation"],
+            "mensaje": _limpiar_explicacion(n["explanation"]),
             "score": float(n["score"]),
             "ciudad": n["city"],
             "modalidad": n["modality"],

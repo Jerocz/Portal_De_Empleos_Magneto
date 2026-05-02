@@ -5,6 +5,8 @@ from fastapi.responses import JSONResponse
 import os
 
 from app.routers import auth, profile, jobs, matching, notifications, applications
+from app.routers import ws as ws_router
+from app.routers import messages
 
 app = FastAPI(title="Portal de Empleos Magneto API")
 
@@ -29,6 +31,8 @@ app.include_router(jobs.router)
 app.include_router(matching.router)
 app.include_router(notifications.router)
 app.include_router(applications.router)
+app.include_router(messages.router)
+app.include_router(ws_router.router)   # WebSocket /ws/{user_id}
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
