@@ -1,59 +1,50 @@
 classDiagram
     %% =============================================
-    %% CAPA DE ESTRATEGIAS (Patrón Strategy)
+    %% CAPA DE ESTRATEGIAS (Patrón Strategy + Composite)
     %% =============================================
 
     class MatchingStrategy {
         <<abstract>>
         +name() str
-        +calculate(user_profile dict, job dict) tuple
+        +calculate(user_profile dict, job dict) tuple[float, str]
     }
 
-    class SkillMatchingStrategy {
+    class CityMatchStrategy {
         +name() str
-        +calculate(user_profile dict, job dict) tuple
-        -_normalize_skills(skills list) set
+        +calculate(user_profile dict, job dict) tuple[float, str]
     }
 
-    class SalaryMatchingStrategy {
+    class ModalityMatchStrategy {
         +name() str
-        +calculate(user_profile dict, job dict) tuple
+        +calculate(user_profile dict, job dict) tuple[float, str]
     }
 
-    class ModalityMatchingStrategy {
-        -_PARTIAL_SCORE float
+    class SalaryMatchStrategy {
         +name() str
-        +calculate(user_profile dict, job dict) tuple
+        +calculate(user_profile dict, job dict) tuple[float, str]
+    }
+
+    class SkillsMatchStrategy {
+        +name() str
+        +calculate(user_profile dict, job dict) tuple[float, str]
     }
 
     class CompositeMatchingStrategy {
-        -_strategies list
-        +DEFAULT_WEIGHTS dict
-        +__init__(strategies list)
-        +calculate(user_profile dict, job dict) tuple
+        -_strategies list[MatchingStrategy]
+        +__init__()
+        +calculate(user_profile dict, job dict) tuple[float, str]
     }
 
-    MatchingStrategy <|-- SkillMatchingStrategy : implements
-    MatchingStrategy <|-- SalaryMatchingStrategy : implements
-    MatchingStrategy <|-- ModalityMatchingStrategy : implements
+    class _normalize {
+        <<function>>
+        +_normalize(text str) str
+    }
+
+    MatchingStrategy <|-- CityMatchStrategy : implements
+    MatchingStrategy <|-- ModalityMatchStrategy : implements
+    MatchingStrategy <|-- SalaryMatchStrategy : implements
+    MatchingStrategy <|-- SkillsMatchStrategy : implements
     CompositeMatchingStrategy o-- MatchingStrategy : composes
-
-    %% =============================================
-    %% CAPA DE SERVICIO
-    %% =============================================
-
-    class MatchingService {
-        -_job_repo JobRepository
-        -_match_repo MatchRepository
-        -_strategy CompositeMatchingStrategy
-        -_db Session
-        +__init__(db Session, strategy CompositeMatchingStrategy)
-        +run_matching(user_id int, user_profile dict) int
-    }
-
-    MatchingService --> CompositeMatchingStrategy : uses
-    MatchingService --> JobRepository : uses
-    MatchingService --> MatchRepository : uses
 
     %% =============================================
     %% CAPA DE REPOSITORIOS (Patrón Repository)
@@ -65,7 +56,8 @@ classDiagram
         +find_by_id(user_id int) dict
         +find_by_email(email str) dict
         +email_exists(email str) bool
-        +create(email str, full_name str, password_hash str) dict
+        +create(email str, full_name str, password_hash str, role str) dict
+        +delete(user_id int) bool
     }
 
     class JobRepository {
@@ -73,7 +65,17 @@ classDiagram
         +__init__(db Session)
         +find_all(city str, modality str, limit int) list
         +find_by_id(job_id int) dict
+        +find_by_employer(user_id int) list
+        +create(title str, ...) dict
+        +delete(job_id int, owner_id int) bool
         -_parse_skills(job dict) dict
+    }
+
+    class ProfileRepository {
+        -_db Session
+        +__init__(db Session)
+        +find_by_user_id(user_id int) dict
+        +upsert(user_id int, ...) None
     }
 
     class MatchRepository {
@@ -85,11 +87,15 @@ classDiagram
         +find_notifications(user_id int, min_score float, limit int) list
     }
 
-    class ProfileRepository {
+    class ApplicationRepository {
         -_db Session
         +__init__(db Session)
-        +find_by_user_id(user_id int) dict
-        +upsert(user_id int, location_city str, modality str, salary_min_cop int, salary_max_cop int, years_exp int, skills list) None
+        +already_applied(job_id int, employee_id int) bool
+        +create(job_id int, employee_id int, message str) dict
+        +find_by_employee(employee_id int) list
+        +find_by_employer(employer_id int) list
+        +update_status(application_id int, employer_id int, status str) bool
+        +delete(application_id int, employee_id int) bool
     }
 
     %% =============================================
@@ -97,6 +103,7 @@ classDiagram
     %% =============================================
 
     class UserProfileDTO {
+        <<dataclass>>
         +id int
         +email str
         +full_name str
@@ -109,6 +116,7 @@ classDiagram
     }
 
     class JobDTO {
+        <<dataclass>>
         +id int
         +title str
         +company str
@@ -121,6 +129,7 @@ classDiagram
     }
 
     class MatchResultDTO {
+        <<dataclass>>
         +id int
         +job_id int
         +title str
@@ -136,6 +145,7 @@ classDiagram
     }
 
     class DTOFactory {
+        <<Pure Fabrication>>
         +create_user_profile_dto(user dict, profile dict) UserProfileDTO
         +create_job_dto(job dict) JobDTO
         +create_match_result_dto(match dict) MatchResultDTO
@@ -164,7 +174,7 @@ classDiagram
     }
 
     %% =============================================
-    %% CAPA DE ROUTERS (Patrón Decorator de FastAPI)
+    %% CAPA DE ROUTERS (Controladores FastAPI)
     %% =============================================
 
     class AuthRouter {
@@ -179,13 +189,17 @@ classDiagram
         +prefix /profile
         +get_profile(current_user dict, db Session) dict
         +update_profile(data ProfileUpdate, current_user dict, db Session) dict
+        +delete_account(current_user dict, db Session) dict
     }
 
     class JobsRouter {
         <<FastAPI Router>>
         +prefix /jobs
-        +list_jobs(city str, modality str, db Session, current_user dict) list
-        +get_job(job_id int, db Session, current_user dict) dict
+        +list_jobs(city str, modality str, db Session) list
+        +create_job(data JobCreate, current_user dict, db Session) dict
+        +my_jobs(current_user dict, db Session) list
+        +get_job(job_id int, db Session) dict
+        +delete_job(job_id int, current_user dict, db Session) dict
     }
 
     class MatchingRouter {
@@ -193,6 +207,16 @@ classDiagram
         +prefix /matches
         +run_matching(current_user dict, db Session) dict
         +get_my_matches(current_user dict, db Session) list
+    }
+
+    class ApplicationsRouter {
+        <<FastAPI Router>>
+        +prefix /applications
+        +apply_to_job(data ApplyData, current_user dict, db Session) dict
+        +my_applications(current_user dict, db Session) list
+        +employer_inbox(current_user dict, db Session) list
+        +update_status(application_id int, data StatusUpdate, current_user dict, db Session) dict
+        +withdraw_application(application_id int, current_user dict, db Session) dict
     }
 
     class NotificationsRouter {
@@ -203,14 +227,17 @@ classDiagram
     }
 
     AuthRouter --> UserRepository : uses
+    AuthRouter --> SecurityModule : uses
     ProfileRouter --> ProfileRepository : uses
+    ProfileRouter --> UserRepository : uses
     ProfileRouter --> DTOFactory : uses
     JobsRouter --> JobRepository : uses
     JobsRouter --> DTOFactory : uses
-    MatchingRouter --> MatchingService : uses
-    MatchingRouter --> MatchRepository : uses
+    MatchingRouter --> CompositeMatchingStrategy : uses
     MatchingRouter --> ProfileRepository : uses
+    MatchingRouter --> JobRepository : uses
+    MatchingRouter --> MatchRepository : uses
     MatchingRouter --> DTOFactory : uses
-    NotificationsRouter --> MatchRepository : uses
-    AuthRouter --> SecurityModule : uses
     MatchingRouter --> SecurityModule : uses
+    ApplicationsRouter --> ApplicationRepository : uses
+    NotificationsRouter --> MatchRepository : uses

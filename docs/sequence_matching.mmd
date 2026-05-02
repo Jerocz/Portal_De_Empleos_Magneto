@@ -1,75 +1,95 @@
 sequenceDiagram
-    actor Usuario
+    actor Empleado
+    actor Empleador
     participant Browser as Browser (JS)
-    participant Router as FastAPI /matches/run
+    participant Router as FastAPI Routers
     participant Auth as security.get_current_user
     participant ProfileRepo as ProfileRepository
-    participant Service as MatchingService
     participant Composite as CompositeMatchingStrategy
-    participant SkillS as SkillMatchingStrategy
-    participant SalaryS as SalaryMatchingStrategy
-    participant ModalityS as ModalityMatchingStrategy
+    participant CityS as CityMatchStrategy
+    participant ModS as ModalityMatchStrategy
+    participant SalS as SalaryMatchStrategy
+    participant SkillS as SkillsMatchStrategy
     participant JobRepo as JobRepository
     participant MatchRepo as MatchRepository
-    participant DB as MySQL
+    participant AppRepo as ApplicationRepository
+    participant DB as MySQL (jeronimo)
 
-    Usuario->>Browser: Clic "Buscar Matches"
-    Browser->>Router: POST /matches/run\nAuthorization: Bearer <token>
-
+    %% ── FLUJO 1: MATCHING ──
+    Note over Empleado,DB: FLUJO 1 — Buscar Matches
+    Empleado->>Browser: Clic "Buscar Matches"
+    Browser->>Router: POST /matches/run · Bearer JWT
     Router->>Auth: get_current_user(token)
-    Auth->>DB: SELECT * FROM users WHERE id = ?
+    Auth->>DB: SELECT * FROM users WHERE id=?
     DB-->>Auth: user row
     Auth-->>Router: current_user dict
 
     Router->>ProfileRepo: find_by_user_id(user_id)
-    ProfileRepo->>DB: SELECT * FROM profiles WHERE user_id = ?
-    DB-->>ProfileRepo: profile row (skills, salary, modality)
+    ProfileRepo->>DB: SELECT * FROM profiles WHERE user_id=?
+    DB-->>ProfileRepo: profile row
     ProfileRepo-->>Router: user_profile dict
 
-    alt perfil sin skills
-        Router-->>Browser: 400 "Completa tu perfil primero"
-    else perfil válido
-        Router->>Service: run_matching(user_id, user_profile)
+    Router->>JobRepo: find_all(limit=50)
+    JobRepo->>DB: SELECT * FROM jobs ORDER BY posted_at DESC
+    DB-->>JobRepo: lista empleos
+    JobRepo-->>Router: list[dict]
 
-        Service->>JobRepo: find_all(limit=200)
-        JobRepo->>DB: SELECT * FROM jobs ORDER BY posted_at DESC
-        DB-->>JobRepo: lista de empleos
-        JobRepo-->>Service: list[dict]
-
-        loop Para cada empleo en la lista
-            Service->>Composite: calculate(user_profile, job)
-
-            Composite->>SkillS: calculate(user_profile, job)
-            Note over SkillS: Intersección de skills\nscore = coincidencias / total_job_skills * 100
-            SkillS-->>Composite: (score_skills: float, msg_skills: str)
-
-            Composite->>SalaryS: calculate(user_profile, job)
-            Note over SalaryS: Solapamiento de rangos salariales\nscore = overlap / job_range * 100
-            SalaryS-->>Composite: (score_salary: float, msg_salary: str)
-
-            Composite->>ModalityS: calculate(user_profile, job)
-            Note over ModalityS: Coincidencia exacta = 100\nHybrid parcial = 50\nSin coincidencia = 0
-            ModalityS-->>Composite: (score_modality: float, msg_modality: str)
-
-            Note over Composite: score_final = skills*0.60 + salary*0.25 + modality*0.15
-            Composite-->>Service: (score_final: float, explanation: str)
-
-            alt score_final > 0
-                Service->>MatchRepo: find_by_user_job_date(user_id, job_id, today)
-                MatchRepo->>DB: SELECT id FROM job_matches\nWHERE user_id=? AND job_id=? AND run_date=?
-                DB-->>MatchRepo: None o existing row
-
-                alt match no existe hoy
-                    Service->>MatchRepo: create(user_id, job_id, score, explanation, today)
-                    MatchRepo->>DB: INSERT INTO job_matches ...
-                    DB-->>MatchRepo: OK
-                    Note over Service: nuevos_matches += 1
-                end
-            end
-        end
-
-        Service->>DB: COMMIT
-        Service-->>Router: nuevos_matches (int)
-        Router-->>Browser: 200 {"message": "Matching completado. N nuevos matches encontrados hoy."}
-        Browser-->>Usuario: Muestra resultado en el dashboard
+    loop Para cada empleo
+        Router->>Composite: calculate(user_profile, job)
+        Composite->>CityS: calculate() → _normalize(city)
+        CityS-->>Composite: (0 o 25, "OK:Ciudad:..." | "NO:Ciudad:...")
+        Composite->>ModS: calculate() → _normalize(modality)
+        ModS-->>Composite: (0 o 25, "OK:Modalidad:..." | "NO:Modalidad:...")
+        Composite->>SalS: calculate() → overlap de rangos
+        SalS-->>Composite: (0 o 25, "OK:Salario:..." | "NO:Salario:...")
+        Composite->>SkillS: calculate() → intersección normalizada
+        SkillS-->>Composite: (0 o 25, "OK:Skills:..." | "NO:Skills:...")
+        Note over Composite: score_total = suma (0–100) · explicación con prefijo OK:/NO:
+        Composite-->>Router: (score: float, explanation: str)
+        Router->>MatchRepo: create(user_id, job_id, score, explanation, today)
+        MatchRepo->>DB: INSERT INTO job_matches ...
     end
+
+    Router-->>Browser: 200 {message, matches_count}
+    Browser-->>Empleado: Cards ordenadas por score con badges OK/NO
+
+    %% ── FLUJO 2: POSTULACIÓN ──
+    Note over Empleado,DB: FLUJO 2 — Postularse a una Vacante
+    Empleado->>Browser: Clic "Postularme" en card
+    Browser-->>Empleado: Modal con campo de mensaje
+    Empleado->>Browser: Escribe mensaje y confirma
+    Browser->>Router: POST /applications/ {job_id, message} · Bearer JWT
+    Router->>Auth: get_current_user(token)
+    Auth-->>Router: current_user (role=employee)
+    Router->>AppRepo: already_applied(job_id, employee_id)
+    AppRepo->>DB: SELECT id FROM applications WHERE job_id=? AND employee_id=?
+    DB-->>AppRepo: None
+    AppRepo-->>Router: False
+    Router->>AppRepo: create(job_id, employee_id, message)
+    AppRepo->>DB: INSERT INTO applications (status='pending')
+    DB-->>AppRepo: OK
+    AppRepo-->>Router: application dict
+    Router-->>Browser: 200 {message: "Postulación enviada", application_id}
+    Browser-->>Empleado: Botón → verde "✓ Postulado" (bloqueado)
+
+    %% ── FLUJO 3: BANDEJA DEL EMPLEADOR ──
+    Note over Empleador,DB: FLUJO 3 — Bandeja de Postulaciones
+    Empleador->>Browser: Clic "Postulaciones" en navbar
+    Browser->>Router: GET /applications/inbox · Bearer JWT
+    Router->>Auth: get_current_user(token)
+    Auth-->>Router: current_user (role=employer)
+    Router->>AppRepo: find_by_employer(employer_id)
+    AppRepo->>DB: SELECT a.*, j.title, u.full_name, u.email, p.* FROM applications a JOIN jobs j JOIN users u LEFT JOIN profiles p WHERE j.posted_by=?
+    DB-->>AppRepo: lista candidatos con perfil completo
+    AppRepo-->>Router: list[dict]
+    Router-->>Browser: 200 lista postulaciones
+    Browser-->>Empleador: Cards agrupadas por vacante con perfil del candidato
+
+    Empleador->>Browser: Clic "Marcar Visto"
+    Browser->>Router: PATCH /applications/{id}/status {status: "seen"} · Bearer JWT
+    Router->>AppRepo: update_status(app_id, employer_id, "seen")
+    AppRepo->>DB: UPDATE applications SET status='seen' WHERE id=? AND job.posted_by=?
+    DB-->>AppRepo: rowcount=1
+    AppRepo-->>Router: True
+    Router-->>Browser: 200 {message: "Estado actualizado"}
+    Browser-->>Empleador: Badge cambia a "👀 Visto"

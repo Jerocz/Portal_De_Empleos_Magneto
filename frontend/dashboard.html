@@ -135,7 +135,6 @@
           }),
         });
         msgEl.innerHTML = `<div class="msg msg-success" style="margin-bottom:12px"><i class="fas fa-circle-check"></i> ¡Postulación enviada!</div>`;
-        // Marcar botón de la card como postulado
         const applyBtn = document.getElementById(`btn-apply-${_modalJobId}`);
         if (applyBtn) {
           applyBtn.innerHTML = '<i class="fas fa-circle-check"></i> Postulado';
@@ -146,9 +145,21 @@
         setTimeout(cerrarModal, 1500);
         cargarMisPostulaciones();
       } catch (err) {
-        msgEl.innerHTML = `<div class="msg msg-error" style="margin-bottom:12px"><i class="fas fa-circle-exclamation"></i> ${err.message}</div>`;
+        // Mostrar el error y rehabilitar el botón siempre
+        const msg = err.message.includes("Ya te postulaste")
+          ? "Ya enviaste una postulación a esta vacante."
+          : err.message;
+        msgEl.innerHTML = `<div class="msg msg-error" style="margin-bottom:12px"><i class="fas fa-circle-exclamation"></i> ${msg}</div>`;
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar postulación';
+        // Marcar el botón de la card como ya postulado
+        const applyBtn = document.getElementById(`btn-apply-${_modalJobId}`);
+        if (applyBtn && err.message.includes("Ya te postulaste")) {
+          applyBtn.innerHTML = '<i class="fas fa-circle-check"></i> Postulado';
+          applyBtn.disabled = true;
+          applyBtn.style.background = "#059669";
+          applyBtn.onclick = null;
+        }
       }
     }
 

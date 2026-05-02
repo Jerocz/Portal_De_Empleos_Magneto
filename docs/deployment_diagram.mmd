@@ -2,70 +2,78 @@ graph TB
     subgraph Cliente["🖥️ NODO: Browser (Cliente Web)"]
         direction TB
         subgraph Paginas["Páginas HTML"]
-            IndexHTML["index.html\n(Login / Registro)"]
-            DashHTML["dashboard.html\n(Matches y Notificaciones)"]
+            IndexHTML["index.html\n(Login / Registro con Rol)"]
+            DashHTML["dashboard.html\n(Matches · Postularme · Mis Postulaciones)"]
+            EmpHTML["employer_dashboard.html\n(Publicar Vacante · Mis Vacantes · Bandeja)"]
+            ProfileHTML["profile.html\n(Perfil · Habilidades · Eliminar Cuenta)"]
             JobsHTML["jobs.html\n(Explorador de Empleos)"]
-            ProfileHTML["profile.html\n(Perfil de Usuario)"]
         end
         subgraph ClienteJS["Lógica JavaScript"]
-            ConfigJS["config.js\n- apiFetch()\n- getToken()\n- requireAuth()\n- logout()"]
-            LocalStorage["localStorage\n- token JWT\n- user data"]
+            ConfigJS["config.js\n- apiFetch() con Content-Type check\n- getToken() / getUser()\n- requireAuth() / logout()"]
+            LocalStorage["localStorage\n- token JWT\n- user (id, role, full_name)"]
         end
         CSSStyles["styles.css\n(Diseño Responsive)"]
     end
 
-    subgraph Servidor["⚙️ NODO: FastAPI Server (Puerto 8000)"]
+    subgraph Servidor["⚙️ NODO: FastAPI Server (localhost:8000)"]
         direction TB
         subgraph ASGI["ASGI: Uvicorn"]
-            FastAPIApp["FastAPI App\n(main.py)"]
+            FastAPIApp["FastAPI App (main.py)\n+ Global Exception Handler → JSON siempre"]
             CORS["CORSMiddleware\n(allow_origins: *)"]
         end
-        subgraph RoutersLayer["Capa de Routers"]
-            AuthR["/auth\n(registro, login)"]
-            ProfileR["/profile\n(GET, PUT)"]
-            JobsR["/jobs\n(listado, detalle)"]
-            MatchR["/matches\n(run, GET)"]
-            NotifR["/notifications\n(GET)"]
+        subgraph RoutersLayer["Capa de Routers (Controladores)"]
+            AuthR["/auth\n(POST register con rol · POST login)"]
+            ProfileR["/profile\n(GET · PUT · DELETE cuenta)"]
+            JobsR["/jobs\n(GET list · POST crear · DELETE · GET my-jobs)"]
+            MatchR["/matches\n(POST run · GET resultados)"]
+            AppR["/applications\n(POST · GET inbox · GET my-apps · PATCH status · DELETE)"]
+            NotifR["/notifications\n(GET top matches)"]
         end
-        subgraph PatternsLayer["Capa de Patrones"]
-            StrategyLayer["Strategy Pattern\n- CompositeMatchingStrategy\n- SkillMatchingStrategy (60%)\n- SalaryMatchingStrategy (25%)\n- ModalityMatchingStrategy (15%)"]
-            ServiceLayer["Service Layer\n- MatchingService"]
-            RepoLayer["Repository Pattern\n- UserRepository\n- JobRepository\n- MatchRepository\n- ProfileRepository"]
-            FactoryLayer["Factory Pattern\n- DTOFactory\n- UserProfileDTO\n- JobDTO\n- MatchResultDTO"]
+        subgraph PatternsLayer["Capa de Lógica y Patrones"]
+            StrategyLayer["Strategy + Composite Pattern\n- CompositeMatchingStrategy\n- CityMatchStrategy (+25 pts)\n- ModalityMatchStrategy (+25 pts)\n- SalaryMatchStrategy (+25 pts)\n- SkillsMatchStrategy (+25 pts)\n- _normalize() → sin tildes/mayúsculas"]
+            FactoryLayer["Factory Pattern\n- DTOFactory\n- UserProfileDTO / JobDTO / MatchResultDTO"]
+        end
+        subgraph RepoLayer["Capa de Repositorios (Repository Pattern)"]
+            UserRepo["UserRepository\n(find · create · delete)"]
+            JobRepo["JobRepository\n(find · create · delete · find_by_employer)"]
+            ProfileRepo["ProfileRepository\n(find · upsert)"]
+            MatchRepo["MatchRepository\n(find · create · notifications)"]
+            AppRepo["ApplicationRepository\n(create · find_by_employee\nfind_by_employer · update_status · delete)"]
         end
         subgraph SecurityLayer["Seguridad"]
-            JWTSec["JWT (PyJWT)\nHS256 / 24h"]
+            JWTSec["JWT HS256 / 24h\n(python-jose)"]
             BcryptSec["bcrypt\n(password hashing)"]
-            OAuth2["OAuth2PasswordBearer"]
+            OAuth2["OAuth2PasswordBearer\n(Depends → get_current_user)"]
         end
         StaticFiles["StaticFiles\n(sirve frontend en /)"]
     end
 
-    subgraph BaseDatos["🗄️ NODO: MySQL Server (Puerto 3306)"]
+    subgraph BaseDatos["🗄️ NODO: MySQL 8.0 (72.62.12.115:3306 · BD: jeronimo)"]
         direction TB
         subgraph Tablas["Tablas"]
-            TUsers[("users\n- id PK\n- email UNIQUE\n- full_name\n- password_hash\n- is_active")]
-            TProfiles[("profiles\n- user_id FK\n- location_city\n- modality\n- salary_min/max_cop\n- years_exp\n- skills JSON")]
-            TJobs[("jobs\n- id PK\n- title\n- company\n- city\n- modality\n- salary_min/max_cop\n- skills_required JSON\n- posted_at")]
-            TMatches[("job_matches\n- id PK\n- user_id FK\n- job_id FK\n- score FLOAT\n- explanation TEXT\n- run_date DATE\n- created_at")]
+            TUsers[("users\n- id BIGINT UNSIGNED PK\n- email UNIQUE · full_name\n- password_hash · role\n- is_active · created_at")]
+            TProfiles[("profiles\n- user_id BIGINT UNSIGNED FK\n- location_city · modality\n- salary_min/max_cop · years_exp\n- skills JSON")]
+            TJobs[("jobs\n- id BIGINT UNSIGNED PK\n- title · company · city\n- modality VARCHAR(30)\n- salary_min/max_cop\n- skills_required JSON\n- posted_by FK · posted_at")]
+            TMatches[("job_matches\n- id PK · user_id FK\n- job_id FK · score\n- explanation TEXT\n- run_date DATE")]
+            TApplications[("applications\n- id BIGINT UNSIGNED PK\n- job_id FK · employee_id FK\n- message TEXT\n- status VARCHAR(20)\n- applied_at\n- UNIQUE(job_id, employee_id)")]
         end
-        ORM["SQLAlchemy ORM\n+ PyMySQL driver"]
+        ORM["SQLAlchemy 2.0\n+ PyMySQL driver\n+ pool_pre_ping + pool_recycle"]
     end
 
     %% Conexiones entre nodos
     Cliente -- "HTTP REST\nBearer JWT\nJSON" --> Servidor
-    Servidor -- "SQLAlchemy\nPyMySQL\nTCP/IP" --> BaseDatos
+    Servidor -- "SQLAlchemy\nPyMySQL TCP/IP" --> BaseDatos
 
     %% Conexiones internas del servidor
     FastAPIApp --> RoutersLayer
     FastAPIApp --> CORS
     FastAPIApp --> StaticFiles
     RoutersLayer --> PatternsLayer
+    RoutersLayer --> RepoLayer
     RoutersLayer --> SecurityLayer
-    PatternsLayer --> ORM
+    RepoLayer --> ORM
     ORM --> Tablas
 
-    %% Notas de despliegue
     style Cliente fill:#dbeafe,stroke:#2563eb,color:#1e3a5f
     style Servidor fill:#dcfce7,stroke:#16a34a,color:#14532d
     style BaseDatos fill:#fef9c3,stroke:#ca8a04,color:#713f12
